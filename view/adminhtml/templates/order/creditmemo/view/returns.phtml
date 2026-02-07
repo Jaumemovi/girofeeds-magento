@@ -1,0 +1,43 @@
+<?php
+/**
+ * @see \Magmodules\Channable\Block\Adminhtml\Order\Creditmemo\View\Returns
+ * @var \Magmodules\Channable\Block\Adminhtml\Order\Creditmemo\View\Returns $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+$autoAccTxt = 'The items below will automatically identified and marked as returned within the Channable platform.';
+?>
+<?php $autoAccepted = $block->autoUpdateReturnsOnCreditmemo(); ?>
+<?php if ($block->showOnCreditmemoCreation() && $returns = $block->checkForReturns()): ?>
+    <div class="admin__page-section-content channable-credit-memo"">
+    <div class="admin__page-section-title">
+            <span class="title" style="display: contents;">
+                <?= $escaper->escapeHtml(__('Available Channable Returns')) ?>
+            </span>
+        <?php if ($autoAccepted): ?>
+            <p style=" display: block; margin-top: 10px;">
+                <?= $escaper->escapeHtml(__($autoAccTxt)) ?>
+            </p>
+        <?php endif; ?>
+    </div>
+    <div class="field choice admin__field admin__field-option field-channable-returns">
+        <?php foreach ($returns as $sku => $return): ?>
+            <?php if (!$autoAccepted): ?>
+                <input
+                        id="channable_return[<?= /* @noEscape */ $sku; ?>]"
+                        class="admin__control-checkbox"
+                        type="checkbox"
+                        value="<?= /* @noEscape */ $sku; ?>"
+                        name="channable_return[<?= /* @noEscape */ $sku; ?>]"/>
+            <?php else: ?>
+                <b>Auto-matched Items</b><br>
+            <?php endif; ?>
+            <label for="channable_return[<?= /* @noEscape */ $sku; ?>]" class="admin__field-label">
+                <span>
+                    <?= $escaper->escapeHtml(__('Accept Return for: %1 (QTY 1)', /* @noEscape */ $sku)) ?>
+                </span>
+            </label>
+        <?php endforeach; ?>
+    </div>
+    </div>
+<?php endif; ?>

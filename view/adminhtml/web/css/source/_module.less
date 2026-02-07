@@ -1,0 +1,35 @@
+//
+//  Imports
+//  ---------------------------------------------
+
+@import './variables/_colors.less';
+@import './module/ui/_button.less';
+@import './module/ui/_modal.less';
+
+@import './module/_header.less';
+@import './module/_version.less';
+@import './module/_debug.less';
+
+@import './extend/_additional.less';
+
+
+//
+//  Common styles
+//  ---------------------------------------------
+
+.admin__page-nav._collapsed.channable-tab .title:before {
+    display: none;
+}
+
+.admin__page-nav._collapsed.channable-tab .title,
+.admin__page-nav._collapsed._show.channable-tab .title  {
+    background-image: url('@{baseDir}Magmodules_Channable/images/channable-logo.png') !important;
+    background-position: 18px center;
+    background-repeat: no-repeat;
+    text-indent: 50px;
+    background-size: auto 60%;
+}
+
+#row_magmodules_channable_debug_error_button .value {
+    padding-top: 8px;
+}

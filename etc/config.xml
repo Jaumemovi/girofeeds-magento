@@ -1,0 +1,90 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Magmodules.eu. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <magmodules_channable>
+            <general>
+                <enable>0</enable>
+                <limit>250</limit>
+                <version>v1.23.0</version>
+            </general>
+            <data>
+                <name_attribute>name</name_attribute>
+                <description_attribute>description</description_attribute>
+                <brand_attribute>manufacturer</brand_attribute>
+                <ean_attribute>sku</ean_attribute>
+                <image>image</image>
+                <sku_attribute>sku</sku_attribute>
+                <size_attribute>size</size_attribute>
+                <color_attribute>color</color_attribute>
+                <material_attribute>material</material_attribute>
+                <gender_attribute>gender</gender_attribute>
+            </data>
+            <types>
+                <configurable>simple</configurable>
+                <configurable_link>1</configurable_link>
+                <configurable_image>2</configurable_image>
+                <configurable_parent_atts>description</configurable_parent_atts>
+                <configurable_nonvisible>1</configurable_nonvisible>
+                <bundle>parent</bundle>
+                <grouped>parent</grouped>
+            </types>
+        </magmodules_channable>
+        <magmodules_channable_marketplace>
+            <general>
+                <enable>0</enable>
+            </general>
+            <order>
+                <shipping_method>flatrate_flatrate</shipping_method>
+                <shipping_method_fallback>flatrate_flatrate</shipping_method_fallback>
+                <import_customer>0</import_customer>
+                <orderid_prefix>M-</orderid_prefix>
+                <orderid_alphanumeric>1</orderid_alphanumeric>
+                <import_company_name>1</import_company_name>
+                <invoice_order_email>0</invoice_order_email>
+                <deduct_fpt>0</deduct_fpt>
+                <transaction_fee>1</transaction_fee>
+                <import_grouped_products>0</import_grouped_products>
+                <import_bundle_products>0</import_bundle_products>
+            </order>
+            <returns>
+                <show_on_creditmemo>1</show_on_creditmemo>
+                <auto_match>1</auto_match>
+                <auto_process_complete>0</auto_process_complete>
+            </returns>
+            <item>
+                <enable>0</enable>
+                <limit>50</limit>
+                <cron>0</cron>
+            </item>
+        </magmodules_channable_marketplace>
+        <payment>
+            <channable>
+                <active>1</active>
+                <model>Magmodules\Channable\Model\Payment\Channable</model>
+                <order_status>pending</order_status>
+                <title>Channable Payment</title>
+                <allowspecific>0</allowspecific>
+            </channable>
+        </payment>
+        <carriers>
+            <channable>
+                <active>1</active>
+                <sallowspecific>0</sallowspecific>
+                <model>Magmodules\Channable\Model\Carrier\Channable</model>
+                <name>Channable Shipping</name>
+                <title>Channable</title>
+                <price>0.00</price>
+                <type>I</type>
+                <overwrite_title>0</overwrite_title>
+                <overwrite_name>0</overwrite_name>
+            </channable>
+        </carriers>
+    </default>
+</config>

@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+/**
+ * Copyright © Magmodules.eu. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+-->
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">channable_returns_grid.channable_returns_grid_data_source</item>
+        </item>
+    </argument>
+    <settings>
+        <spinner>channable_returns_columns</spinner>
+        <deps>
+            <dep>channable_returns_grid.channable_returns_grid_data_source</dep>
+        </deps>
+    </settings>
+    <dataSource name="channable_returns_grid_data_source" component="Magento_Ui/js/grid/provider">
+        <settings>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <dataProvider class="Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider" name="channable_returns_grid_data_source">
+            <settings>
+                <requestFieldName>id</requestFieldName>
+                <primaryFieldName>main_table.entity_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+    <listingToolbar name="listing_top">
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <massaction name="listing_massaction">
+            <action name="process">
+                <settings>
+                    <confirm>
+                        <message translate="true">Are you sure you want to reprocess all selected returns?</message>
+                        <title translate="true">Re-process</title>
+                    </confirm>
+                    <url path="channable/returns/massProcess"/>
+                    <type>relink</type>
+                    <label translate="true">Re-process</label>
+                </settings>
+            </action>
+            <action name="delete">
+                <settings>
+                    <confirm>
+                        <message translate="true">Are you sure you want to delete these returns? This action can not be undone and will not update the status on Channable!</message>
+                        <title translate="true">Delete</title>
+                    </confirm>
+                    <url path="channable/returns/massDelete"/>
+                    <type>delete</type>
+                    <label translate="true">Delete</label>
+                </settings>
+            </action>
+            <action name="creditmemo">
+                <settings>
+                    <confirm>
+                        <message translate="true">Are you sure you want to create a credit memo for all selected returns?</message>
+                        <title translate="true">Credit Memo</title>
+                    </confirm>
+                    <url path="channable/returns/massCreditmemo"/>
+                    <type>creditmemo</type>
+                    <label translate="true">Create Credit Memo</label>
+                </settings>
+            </action>
+            <action name="creditmemo_accept">
+                <settings>
+                    <confirm>
+                        <message translate="true">Are you sure you want to create a credit memo for all selected returns?</message>
+                        <title translate="true">Credit Memo</title>
+                    </confirm>
+                    <url path="channable/returns/massCreditmemo/status/accept"/>
+                    <type>creditmemo</type>
+                    <label translate="true">Create Credit Memo + Set as Accepted</label>
+                </settings>
+            </action>
+        </massaction>
+        <filters name="listing_filters">
+            <settings>
+                <templates>
+                    <filters>
+                        <select>
+                            <param name="template" xsi:type="string">ui/grid/filters/elements/ui-select</param>
+                            <param name="component" xsi:type="string">Magento_Ui/js/form/element/ui-select</param>
+                        </select>
+                    </filters>
+                </templates>
+            </settings>
+            <filterSelect name="store_id" provider="${ $.parentName }">
+                <settings>
+                    <captionValue>0</captionValue>
+                    <options class="Magento\Cms\Ui\Component\Listing\Column\Cms\Options"/>
+                    <label translate="true">Store View</label>
+                    <dataScope>store_id</dataScope>
+                    <imports>
+                        <link name="visible">componentType = column, index = ${ $.index }:visible</link>
+                    </imports>
+                </settings>
+            </filterSelect>
+        </filters>
+        <paging name="listing_paging"/>
+    </listingToolbar>
+    <columns name="channable_returns_columns">
+        <selectionsColumn name="ids">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="indexField" xsi:type="string">entity_id</item>
+                </item>
+            </argument>
+        </selectionsColumn>
+        <column name="entity_id">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">ID</label>
+            </settings>
+        </column>
+        <column name="store_id" class="Magento\Search\Ui\Component\Listing\Column\StoreView">
+            <settings>
+                <filter>store</filter>
+                <label translate="true">Store</label>
+            </settings>
+        </column>
+        <column name="magento_order_id">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Order ID</label>
+                <visible>false</visible>
+            </settings>
+        </column>
+        <column name="magento_increment_id" class="Magmodules\Channable\Ui\Component\Listing\Column\Returns\Order">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Magento Order</label>
+                <bodyTmpl>ui/grid/cells/html</bodyTmpl>
+            </settings>
+        </column>
+        <column name="magento_creditmemo_increment_id" class="Magmodules\Channable\Ui\Component\Listing\Column\Returns\Creditmemo">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Magento Creditmemo</label>
+                <bodyTmpl>ui/grid/cells/html</bodyTmpl>
+            </settings>
+        </column>
+        <column name="channel_return_id">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Channel Return ID</label>
+                <visible>false</visible>
+            </settings>
+        </column>
+        <column name="channel_order_id">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Channel Order ID</label>
+                <visible>false</visible>
+            </settings>
+        </column>
+        <column name="channel_order_id_internal">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Channel Order ID (int)</label>
+                <visible>false</visible>
+            </settings>
+        </column>
+        <column name="platform_order_id">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Platform Order ID</label>
+                <visible>false</visible>
+            </settings>
+        </column>
+        <column name="customer_name">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Customer</label>
+            </settings>
+        </column>
+        <column name="item" class="Magmodules\Channable\Ui\Component\Listing\Column\Returns\Item">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Item</label>
+                <bodyTmpl>ui/grid/cells/html</bodyTmpl>
+            </settings>
+        </column>
+        <column name="reason" class="Magmodules\Channable\Ui\Component\Listing\Column\Returns\Reason">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Reason</label>
+                <bodyTmpl>ui/grid/cells/html</bodyTmpl>
+            </settings>
+        </column>
+        <column name="qty_creditmemos">
+            <settings>
+                <label translate="true">Order Creditmemos</label>
+                <bodyTmpl>ui/grid/cells/html</bodyTmpl>
+                <sortable>false</sortable>
+            </settings>
+        </column>
+        <column name="order_status" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <filter>select</filter>
+                <options class="Magento\Sales\Ui\Component\Listing\Column\Status\Options"/>
+                <dataType>select</dataType>
+                <label translate="true">Order Status</label>
+            </settings>
+        </column>
+        <column name="created_at" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <sorting>desc</sorting>
+                <label translate="true">Imported</label>
+            </settings>
+        </column>
+        <column name="status" class="Magmodules\Channable\Ui\Component\Listing\Column\Returns\Status">
+            <settings>
+                <options class="Magmodules\Channable\Model\System\Config\Source\ReturnsStatus"/>
+                <filter>select</filter>
+                <editor>
+                    <editorType>select</editorType>
+                </editor>
+                <dataType>select</dataType>
+                <label translate="true">Status</label>
+            </settings>
+        </column>
+        <actionsColumn name="actions" class="Magmodules\Channable\Ui\Component\Listing\Column\Returns\Actions">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="indexField" xsi:type="string">id</item>
+                </item>
+            </argument>
+        </actionsColumn>
+    </columns>
+</listing>

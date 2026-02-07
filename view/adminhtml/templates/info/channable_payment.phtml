@@ -1,0 +1,135 @@
+<?php
+/**
+ * Copyright © Magmodules.eu. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+/**
+ * @var \Magmodules\Channable\Block\Info\Channable $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$specificInfo = $block->getSpecificInformation();
+$info = $block->getInfo();
+?>
+<?= $escaper->escapeHtml($block->getMethod()->getTitle()); ?>
+
+    <table class="data-table admin__table-secondary channable">
+        <tbody>
+        <?php if ($channelName = $info->getAdditionalInformation('channel_name')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Channel Name')); ?></th>
+                <td><?= $escaper->escapeHtml($channelName); ?></td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($channelLabel = $info->getAdditionalInformation('channel_label')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Channel Label')); ?></th>
+                <td><?= $escaper->escapeHtml($channelLabel); ?></td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($channelId = $info->getAdditionalInformation('channel_id')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Channel ID')); ?></th>
+                <td><?= $escaper->escapeHtml($channelId); ?></td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($shippingCenterId = $info->getAdditionalInformation('shipping_center_id')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Service Point ID')); ?></th>
+                <td><?= $escaper->escapeHtml($shippingCenterId); ?></td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($shipmentPromise = $info->getAdditionalInformation('shipment_promise')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Shipment Promise')); ?></th>
+                <td><?= $escaper->escapeHtml($shipmentPromise); ?></td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($channelCustomerNumber = $info->getAdditionalInformation('channel_customer_number')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Channel Customer Number')); ?></th>
+                <td><?= $escaper->escapeHtml($channelCustomerNumber); ?></td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($externalArticleNumbers = $info->getAdditionalInformation('external_article_numbers')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('External Article Number(s)')); ?></th>
+                <td>
+                    <div class="channable-tooltip"><?= $escaper->escapeHtml(__('Show Numbers')); ?>
+                        <span>
+                            <table class="channable-delivery-info-table">
+                                <tr>
+                                    <td>
+                                        <?= /* @noEscape */ nl2br($escaper->escapeHtml($externalArticleNumbers)); ?>
+                                    </td>
+                                </tr>
+                            </table>
+                        </span>
+                    </div>
+                </td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($channableId = $info->getAdditionalInformation('channable_id')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Channable ID')); ?></th>
+                <td><?= $escaper->escapeHtml($channableId); ?></td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($commission = $info->getAdditionalInformation('commission')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Commission')); ?></th>
+                <td><?= $escaper->escapeHtml($commission); ?></td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($delivery = $info->getAdditionalInformation('delivery')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Delivery')); ?></th>
+                <td>
+                    <div class="channable-tooltip"><?= $escaper->escapeHtml(__('Show Delivery Periods')); ?>
+                        <span>
+                            <table class="channable-delivery-info-table">
+                                <?php foreach ($delivery as $item): ?>
+                                    <tr>
+                                        <td><?= $escaper->escapeHtml($item['title']); ?></td>
+                                        <td><?= $escaper->escapeHtml($item['ean']); ?></td>
+                                        <td><?= $escaper->escapeHtml($item['delivery_period']); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </table>
+                        </span>
+                    </div>
+                </td>
+            </tr>
+        <?php endif; ?>
+
+        <?php if ($memo = $info->getAdditionalInformation('memo')): ?>
+            <tr>
+                <th><?= $escaper->escapeHtml(__('Memo')); ?></th>
+                <td>
+                    <div class="channable-tooltip"><?= $escaper->escapeHtml(__('Show Memo Data')); ?>
+                        <span>
+                            <table class="channable-delivery-info-table">
+                                <tr>
+                                    <td>
+                                        <?= /* @noEscape */ nl2br($escaper->escapeHtml($memo)); ?>
+                                    </td>
+                                </tr>
+                            </table>
+                        </span>
+                    </div>
+                </td>
+            </tr>
+        <?php endif; ?>
+        </tbody>
+    </table>
+
+<?= $block->getChildHtml(); ?>
