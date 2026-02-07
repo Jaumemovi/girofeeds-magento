@@ -1,10 +1,8 @@
 <?php
-/**
- * Copyright © 2019 Magmodules.eu. All rights reserved.
- * See COPYING.txt for license details.
- */
 
-namespace Magmodules\Channable\Helper;
+declare(strict_types=1);
+
+namespace Girofeeds\ProductApi\Helper;
 
 use Magento\Catalog\Model\Product\TypeFactory;
 use Magento\Framework\App\Helper\AbstractHelper;
@@ -12,96 +10,69 @@ use Magento\Framework\App\Helper\Context;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Framework\Exception\LocalizedException;
-use Magmodules\Channable\Service\Product\InventorySource;
+use Girofeeds\ProductApi\Service\Product\InventorySource;
 
-/**
- * Class Source
- *
- * @package Magmodules\Channable\Helper
- */
 class Source extends AbstractHelper
 {
 
-    const XPATH_LIMIT = 'magmodules_channable/general/limit';
-    const XPATH_NAME_SOURCE = 'magmodules_channable/data/name_attribute';
-    const XPATH_DESCRIPTION_SOURCE = 'magmodules_channable/data/description_attribute';
-    const XPATH_BRAND_SOURCE = 'magmodules_channable/data/brand_attribute';
-    const XPATH_EAN_SOURCE = 'magmodules_channable/data/ean_attribute';
-    const XPATH_IMAGE_SOURCE = 'magmodules_channable/data/image';
-    const XPATH_IMAGE_MAIN = 'magmodules_channable/data/main_image';
-    const XPATH_IMAGE_INC_HIDDEN = 'magmodules_channable/data/hidden_images';
-    const XPATH_SKU_SOURCE = 'magmodules_channable/data/sku_attribute';
-    const XPATH_SIZE_SOURCE = 'magmodules_channable/data/size_attribute';
-    const XPATH_COLOR_SOURCE = 'magmodules_channable/data/color_attribute';
-    const XPATH_MATERIAL_SOURCE = 'magmodules_channable/data/material_attribute';
-    const XPATH_GENDER_SOURCE = 'magmodules_channable/data/gender_attribute';
-    const XPATH_EXTRA_FIELDS = 'magmodules_channable/advanced/extra_fields';
+    const XPATH_LIMIT = 'girofeeds_productapi/general/limit';
+    const XPATH_NAME_SOURCE = 'girofeeds_productapi/data/name_attribute';
+    const XPATH_DESCRIPTION_SOURCE = 'girofeeds_productapi/data/description_attribute';
+    const XPATH_SHORT_DESCRIPTION_SOURCE = 'girofeeds_productapi/data/short_description_attribute';
+    const XPATH_BRAND_SOURCE = 'girofeeds_productapi/data/brand_attribute';
+    const XPATH_EAN_SOURCE = 'girofeeds_productapi/data/ean_attribute';
+    const XPATH_IMAGE_SOURCE = 'girofeeds_productapi/data/image';
+    const XPATH_IMAGE_MAIN = 'girofeeds_productapi/data/main_image';
+    const XPATH_IMAGE_INC_HIDDEN = 'girofeeds_productapi/data/hidden_images';
+    const XPATH_SKU_SOURCE = 'girofeeds_productapi/data/sku_attribute';
+    const XPATH_SIZE_SOURCE = 'girofeeds_productapi/data/size_attribute';
+    const XPATH_COLOR_SOURCE = 'girofeeds_productapi/data/color_attribute';
+    const XPATH_MATERIAL_SOURCE = 'girofeeds_productapi/data/material_attribute';
+    const XPATH_GENDER_SOURCE = 'girofeeds_productapi/data/gender_attribute';
+    const XPATH_EXTRA_FIELDS = 'girofeeds_productapi/advanced/extra_fields';
     const XPATH_WEIGHT_UNIT = 'general/locale/weight_unit';
-    const XPATH_VISBILITY = 'magmodules_channable/filter/visbility_enabled';
-    const XPATH_VISIBILITY_OPTIONS = 'magmodules_channable/filter/visbility';
-    const XPATH_STOCK = 'magmodules_channable/filter/stock';
-    const XPATH_DELIVERY_TIME = 'magmodules_channable/advanced/delivery_time';
-    const XPATH_INVENTORY = 'magmodules_channable/advanced/inventory';
-    const XPATH_INVENTORY_DATA = 'magmodules_channable/advanced/inventory_fields';
-    const XPATH_FORCE_NON_MSI = 'magmodules_channable/advanced/force_non_msi';
-    const XPATH_INVENTORY_SOURCE_ITEMS = 'magmodules_channable/advanced/inventory_source_items';
-    const XPATH_TAX = 'magmodules_channable/advanced/tax';
-    const XPATH_TAX_INCLUDE_BOTH = 'magmodules_channable/advanced/tax_include_both';
+    const XPATH_VISBILITY = 'girofeeds_productapi/filter/visbility_enabled';
+    const XPATH_VISIBILITY_OPTIONS = 'girofeeds_productapi/filter/visbility';
+    const XPATH_STOCK = 'girofeeds_productapi/filter/stock';
+    const XPATH_INVENTORY = 'girofeeds_productapi/advanced/inventory';
+    const XPATH_INVENTORY_DATA = 'girofeeds_productapi/advanced/inventory_fields';
+    const XPATH_FORCE_NON_MSI = 'girofeeds_productapi/advanced/force_non_msi';
+    const XPATH_INVENTORY_SOURCE_ITEMS = 'girofeeds_productapi/advanced/inventory_source_items';
+    const XPATH_TAX = 'girofeeds_productapi/advanced/tax';
+    const XPATH_TAX_INCLUDE_BOTH = 'girofeeds_productapi/advanced/tax_include_both';
     const XPATH_MANAGE_STOCK = 'cataloginventory/item_options/manage_stock';
     const XPATH_MIN_SALES_QTY = 'cataloginventory/item_options/min_sale_qty';
     const XPATH_QTY_INCREMENTS = 'cataloginventory/item_options/qty_increments';
     const XPATH_QTY_INC_ENABLED = 'cataloginventory/item_options/enable_qty_increments';
     const XPATH_ENABLE_BACKORDERS = 'cataloginventory/item_options/backorders';
-    const XPATH_CATEGORY_FILTER = 'magmodules_channable/filter/category_enabled';
-    const XPATH_CATEGORY_FILTER_TYPE = 'magmodules_channable/filter/category_type';
-    const XPATH_CATEGORY_IDS = 'magmodules_channable/filter/category';
-    const XPATH_FILTERS = 'magmodules_channable/filter/filters';
-    const XPATH_FILTERS_DATA = 'magmodules_channable/filter/filters_data';
-    const XPATH_ADD_DISABLED = 'magmodules_channable/filter/add_disabled';
-    const XPATH_CONFIGURABLE = 'magmodules_channable/types/configurable';
-    const XPATH_CONFIGURABLE_LINK = 'magmodules_channable/types/configurable_link';
-    const XPATH_CONFIGURABLE_IMAGE = 'magmodules_channable/types/configurable_image';
-    const XPATH_CONFIGURABLE_PARENT_ATTS = 'magmodules_channable/types/configurable_parent_atts';
-    const XPATH_CONFIGURABLE_NONVISIBLE = 'magmodules_channable/types/configurable_nonvisible';
-    const XPATH_BUNDLE = 'magmodules_channable/types/bundle';
-    const XPATH_BUNDLE_LINK = 'magmodules_channable/types/bundle_link';
-    const XPATH_BUNDLE_IMAGE = 'magmodules_channable/types/bundle_image';
-    const XPATH_BUNDLE_PARENT_ATTS = 'magmodules_channable/types/bundle_parent_atts';
-    const XPATH_BUNDLE_NONVISIBLE = 'magmodules_channable/types/bundle_nonvisible';
-    const XPATH_GROUPED = 'magmodules_channable/types/grouped';
-    const XPATH_GROUPED_LINK = 'magmodules_channable/types/grouped_link';
-    const XPATH_GROUPED_IMAGE = 'magmodules_channable/types/grouped_image';
-    const XPATH_GROUPED_PARENT_PRICE = 'magmodules_channable/types/grouped_parent_price';
-    const XPATH_GROUPED_PARENT_ATTS = 'magmodules_channable/types/grouped_parent_atts';
-    const XPATH_GROUPED_NONVISIBLE = 'magmodules_channable/types/grouped_nonvisible';
+    const XPATH_CATEGORY_FILTER = 'girofeeds_productapi/filter/category_enabled';
+    const XPATH_CATEGORY_FILTER_TYPE = 'girofeeds_productapi/filter/category_type';
+    const XPATH_CATEGORY_IDS = 'girofeeds_productapi/filter/category';
+    const XPATH_FILTERS = 'girofeeds_productapi/filter/filters';
+    const XPATH_FILTERS_DATA = 'girofeeds_productapi/filter/filters_data';
+    const XPATH_ADD_DISABLED = 'girofeeds_productapi/filter/add_disabled';
+    const XPATH_CONFIGURABLE = 'girofeeds_productapi/types/configurable';
+    const XPATH_CONFIGURABLE_LINK = 'girofeeds_productapi/types/configurable_link';
+    const XPATH_CONFIGURABLE_IMAGE = 'girofeeds_productapi/types/configurable_image';
+    const XPATH_CONFIGURABLE_PARENT_ATTS = 'girofeeds_productapi/types/configurable_parent_atts';
+    const XPATH_CONFIGURABLE_NONVISIBLE = 'girofeeds_productapi/types/configurable_nonvisible';
+    const XPATH_BUNDLE = 'girofeeds_productapi/types/bundle';
+    const XPATH_BUNDLE_LINK = 'girofeeds_productapi/types/bundle_link';
+    const XPATH_BUNDLE_IMAGE = 'girofeeds_productapi/types/bundle_image';
+    const XPATH_BUNDLE_PARENT_ATTS = 'girofeeds_productapi/types/bundle_parent_atts';
+    const XPATH_BUNDLE_NONVISIBLE = 'girofeeds_productapi/types/bundle_nonvisible';
+    const XPATH_GROUPED = 'girofeeds_productapi/types/grouped';
+    const XPATH_GROUPED_LINK = 'girofeeds_productapi/types/grouped_link';
+    const XPATH_GROUPED_IMAGE = 'girofeeds_productapi/types/grouped_image';
+    const XPATH_GROUPED_PARENT_PRICE = 'girofeeds_productapi/types/grouped_parent_price';
+    const XPATH_GROUPED_PARENT_ATTS = 'girofeeds_productapi/types/grouped_parent_atts';
+    const XPATH_GROUPED_NONVISIBLE = 'girofeeds_productapi/types/grouped_nonvisible';
 
-    /**
-     * @var General
-     */
     private $generalHelper;
-    /**
-     * @var Product
-     */
     private $productHelper;
-    /**
-     * @var Item
-     */
-    private $itemHelper;
-    /**
-     * @var StoreManagerInterface
-     */
     private $storeManager;
-    /**
-     * @var InventorySource
-     */
     private $inventorySource;
-    /**
-     * @var TypeFactory
-     */
     private $typeFactory;
-    /**
-     * @var
-     */
     private $storeId = null;
 
     public function __construct(
@@ -110,28 +81,16 @@ class Source extends AbstractHelper
         General $generalHelper,
         Product $productHelper,
         InventorySource $inventorySource,
-        TypeFactory $typeFactory,
-        Item $itemHelper
+        TypeFactory $typeFactory
     ) {
         $this->generalHelper = $generalHelper;
         $this->productHelper = $productHelper;
-        $this->itemHelper = $itemHelper;
         $this->typeFactory = $typeFactory;
         $this->storeManager = $storeManager;
         $this->inventorySource = $inventorySource;
         parent::__construct($context);
     }
 
-    /**
-     * Get config data as array
-     *
-     * @param int $storeId
-     * @param string|null $type
-     * @param string|null $currency
-     * @return array
-     * @throws LocalizedException
-     * @throws NoSuchEntityException
-     */
     public function getConfig(int $storeId, ?string $type = 'feed', ?string $currency = null): array
     {
         $config = [
@@ -147,19 +106,12 @@ class Source extends AbstractHelper
             'inventory' => $this->getInventoryData($type),
             'inc_hidden_image' => $this->getStoreValue(self::XPATH_IMAGE_INC_HIDDEN)
         ];
-        switch ($type) {
-            case 'feed':
-                $config += [
-                    'base_url' => $this->storeManager->getStore()->getBaseUrl(),
-                    'weight_unit' => ' ' . $this->getStoreValue(self::XPATH_WEIGHT_UNIT),
-                    'item_updates' =>  $this->itemHelper->isEnabled($storeId),
-                    'delivery' => $this->getStoreValue(self::XPATH_DELIVERY_TIME)
-                ];
-                break;
-            case 'api':
-                $config['api'] = $this->itemHelper->getApiConfigDetails($storeId);
-                break;
 
+        if ($type === 'feed') {
+            $config += [
+                'base_url' => $this->storeManager->getStore()->getBaseUrl(),
+                'weight_unit' => ' ' . $this->getStoreValue(self::XPATH_WEIGHT_UNIT),
+            ];
         }
 
         $this->storeId = null;
@@ -167,11 +119,6 @@ class Source extends AbstractHelper
         return $config;
     }
 
-    /**
-     * @param null $storeId
-     *
-     * @return null
-     */
     public function getStoreId($storeId = null)
     {
         if ($this->storeId === null) {
@@ -187,11 +134,6 @@ class Source extends AbstractHelper
         return array_keys($typeInstance->getOptionArray());
     }
 
-    /**
-     * @param $type
-     *
-     * @return array
-     */
     public function getProductFilters($type): array
     {
         $filters = [
@@ -420,9 +362,6 @@ class Source extends AbstractHelper
         }
 
         $filters['limit'] = (int)$this->getStoreValue(self::XPATH_LIMIT);
-        if ($type == 'api') {
-            $filters['limit'] = 0;
-        }
 
         $filters['stock'] = $this->getStoreValue(self::XPATH_STOCK);
 
@@ -453,33 +392,16 @@ class Source extends AbstractHelper
         return $filters;
     }
 
-    /**
-     * @param $path
-     *
-     * @return mixed
-     */
     public function getStoreValue($path)
     {
         return $this->generalHelper->getStoreValue($path, $this->storeId);
     }
 
-    /**
-     * @param $path
-     *
-     * @return mixed
-     */
     public function getStoreValueArray($path)
     {
         return $this->generalHelper->getStoreValueArray($path, $this->storeId);
     }
 
-    /**
-     * @param       $type
-     * @param array $filters
-     * @param null  $storeId
-     *
-     * @return array
-     */
     public function getAttributes($type, $filters = [], $storeId = null)
     {
         $this->getStoreId($storeId);
@@ -528,122 +450,124 @@ class Source extends AbstractHelper
             'source' => 'price_type'
         ];
 
-        if ($type != 'api') {
-            $attributes['updated_at'] = [
-                'label'  => 'updated_at',
-                'source' => 'updated_at',
-            ];
-            $attributes['created_at'] = [
-                'label'  => 'created_at',
-                'source' => 'created_at',
-            ];
-            $attributes['availability'] = [
-                'label'     => 'availability',
-                'source'    => 'is_in_stock',
-                'condition' => [
-                    '1:in stock',
-                    '0:out of stock'
-                ]
-            ];
-            $attributes['description'] = [
-                'label'  => 'description',
-                'source' => $this->getStoreValue(self::XPATH_DESCRIPTION_SOURCE),
-            ];
-            $attributes['link'] = [
-                'label'  => 'link',
-                'source' => 'product_url',
-            ];
-            $attributes['image_link'] = [
-                'label'  => 'image_link',
-                'source' => $this->getStoreValue(self::XPATH_IMAGE_SOURCE),
-                'main'   => $this->getStoreValue(self::XPATH_IMAGE_MAIN),
-            ];
-            $attributes['brand'] = [
-                'label'  => 'brand',
-                'source' => $this->getStoreValue(self::XPATH_BRAND_SOURCE),
-            ];
-            $attributes['sku'] = [
-                'label'  => 'sku',
-                'source' => $this->getStoreValue(self::XPATH_SKU_SOURCE),
-            ];
-            $attributes['color'] = [
-                'label'  => 'color',
-                'source' => $this->getStoreValue(self::XPATH_COLOR_SOURCE),
-            ];
-            $attributes['gender'] = [
-                'label'  => 'gender',
-                'source' => $this->getStoreValue(self::XPATH_GENDER_SOURCE)
-            ];
-            $attributes['material'] = [
-                'label'  => 'material',
-                'source' => $this->getStoreValue(self::XPATH_MATERIAL_SOURCE),
-            ];
-            $attributes['size'] = [
-                'label'  => 'size',
-                'source' => $this->getStoreValue(self::XPATH_SIZE_SOURCE),
-            ];
+        $attributes['updated_at'] = [
+            'label'  => 'updated_at',
+            'source' => 'updated_at',
+        ];
+        $attributes['created_at'] = [
+            'label'  => 'created_at',
+            'source' => 'created_at',
+        ];
+        $attributes['availability'] = [
+            'label'     => 'availability',
+            'source'    => 'is_in_stock',
+            'condition' => [
+                '1:in stock',
+                '0:out of stock'
+            ]
+        ];
+        $attributes['description'] = [
+            'label'  => 'description',
+            'source' => $this->getStoreValue(self::XPATH_DESCRIPTION_SOURCE),
+        ];
+        $attributes['short_description'] = [
+            'label'  => 'short_description',
+            'source' => $this->getStoreValue(self::XPATH_SHORT_DESCRIPTION_SOURCE),
+        ];
+        $attributes['link'] = [
+            'label'  => 'link',
+            'source' => 'product_url',
+        ];
+        $attributes['image_link'] = [
+            'label'  => 'image_link',
+            'source' => $this->getStoreValue(self::XPATH_IMAGE_SOURCE),
+            'main'   => $this->getStoreValue(self::XPATH_IMAGE_MAIN),
+        ];
+        $attributes['brand'] = [
+            'label'  => 'brand',
+            'source' => $this->getStoreValue(self::XPATH_BRAND_SOURCE),
+        ];
+        $attributes['sku'] = [
+            'label'  => 'sku',
+            'source' => $this->getStoreValue(self::XPATH_SKU_SOURCE),
+        ];
+        $attributes['color'] = [
+            'label'  => 'color',
+            'source' => $this->getStoreValue(self::XPATH_COLOR_SOURCE),
+        ];
+        $attributes['gender'] = [
+            'label'  => 'gender',
+            'source' => $this->getStoreValue(self::XPATH_GENDER_SOURCE)
+        ];
+        $attributes['material'] = [
+            'label'  => 'material',
+            'source' => $this->getStoreValue(self::XPATH_MATERIAL_SOURCE),
+        ];
+        $attributes['size'] = [
+            'label'  => 'size',
+            'source' => $this->getStoreValue(self::XPATH_SIZE_SOURCE),
+        ];
 
-            if ($inventory) {
-                $inventoryData = explode(',', (string)$this->getStoreValue(self::XPATH_INVENTORY_DATA));
-                if (in_array('min_sale_qty', $inventoryData)) {
-                    $attributes['min_sale_qty'] = [
-                        'label' => 'min_sale_qty',
-                        'source' => 'min_sale_qty',
-                        'actions' => ['number'],
-                        'default' => '1.00',
-                    ];
-                }
-                if (in_array('qty_increments', $inventoryData)) {
-                    $attributes['qty_increments'] = [
-                        'label' => 'qty_increments',
-                        'source' => 'qty_increments',
-                        'actions' => ['number'],
-                        'default' => '1.00',
-                    ];
-                }
-                if (in_array('backorders', $inventoryData)) {
-                    $attributes['backorders'] = [
-                        'label'   => 'backorders',
-                        'source'  => 'backorders'
-                    ];
-                }
-
-                if ($this->getStoreValue(self::XPATH_INVENTORY_SOURCE_ITEMS)) {
-                    $attributes['inventory_source_items'] = [
-                        'label'   => 'inventory_source_items',
-                        'source'  => 'inventory_source_items'
-                    ];
-                }
-
+        if ($inventory) {
+            $inventoryData = explode(',', (string)$this->getStoreValue(self::XPATH_INVENTORY_DATA));
+            if (in_array('min_sale_qty', $inventoryData)) {
+                $attributes['min_sale_qty'] = [
+                    'label' => 'min_sale_qty',
+                    'source' => 'min_sale_qty',
+                    'actions' => ['number'],
+                    'default' => '1.00',
+                ];
             }
-            $attributes['weight'] = [
-                'label'   => 'shipping_weight',
-                'source'  => 'weight',
-                'suffix'  => 'weight_unit',
-                'actions' => ['number']
-            ];
-            $attributes['item_group_id'] = [
-                'label'  => 'item_group_id',
-                'source' => $attributes['id']['source'],
-                'parent_selection_disabled' => 1,
-                'parent' => 2
-            ];
-            $attributes['is_bundle'] = [
-                'label'                     => 'is_bundle',
-                'source'                    => 'type_id',
-                'condition'                 => [
-                    '*:false',
-                    'bundle:true',
-                ],
-                'parent_selection_disabled' => 1,
-            ];
+            if (in_array('qty_increments', $inventoryData)) {
+                $attributes['qty_increments'] = [
+                    'label' => 'qty_increments',
+                    'source' => 'qty_increments',
+                    'actions' => ['number'],
+                    'default' => '1.00',
+                ];
+            }
+            if (in_array('backorders', $inventoryData)) {
+                $attributes['backorders'] = [
+                    'label'   => 'backorders',
+                    'source'  => 'backorders'
+                ];
+            }
 
-            if ($extraFields = $this->getExtraFields()) {
-                $attributes = array_merge($attributes, $extraFields);
+            if ($this->getStoreValue(self::XPATH_INVENTORY_SOURCE_ITEMS)) {
+                $attributes['inventory_source_items'] = [
+                    'label'   => 'inventory_source_items',
+                    'source'  => 'inventory_source_items'
+                ];
             }
         }
 
-        if ($inventory || $type == 'api') {
+        $attributes['weight'] = [
+            'label'   => 'shipping_weight',
+            'source'  => 'weight',
+            'suffix'  => 'weight_unit',
+            'actions' => ['number']
+        ];
+        $attributes['item_group_id'] = [
+            'label'  => 'item_group_id',
+            'source' => $attributes['id']['source'],
+            'parent_selection_disabled' => 1,
+            'parent' => 2
+        ];
+        $attributes['is_bundle'] = [
+            'label'                     => 'is_bundle',
+            'source'                    => 'type_id',
+            'condition'                 => [
+                '*:false',
+                'bundle:true',
+            ],
+            'parent_selection_disabled' => 1,
+        ];
+
+        if ($extraFields = $this->getExtraFields()) {
+            $attributes = array_merge($attributes, $extraFields);
+        }
+
+        if ($inventory) {
             $attributes['manage_stock'] = [
                 'label'     => 'manage_stock',
                 'source'    => 'manage_stock',
@@ -655,7 +579,7 @@ class Source extends AbstractHelper
             $attributes['qty'] = [
                 'label'   => 'qty',
                 'source'  => 'qty',
-                'actions' => $type == 'api' ? ['round'] : [],
+                'actions' => [],
             ];
         }
 
@@ -666,9 +590,6 @@ class Source extends AbstractHelper
         }
     }
 
-    /**
-     * @return array
-     */
     public function getExtraFields(): array
     {
         $extraFields = [];
@@ -694,13 +615,6 @@ class Source extends AbstractHelper
         return $extraFields;
     }
 
-    /**
-     * @param string|null $type
-     * @param string|null $currency
-     * @return array
-     * @throws LocalizedException
-     * @throws NoSuchEntityException
-     */
     public function getPriceConfig(?string $type, ?string $currency = null): array
     {
         $store = $this->storeManager->getStore();
@@ -727,11 +641,7 @@ class Source extends AbstractHelper
             $priceFields['incl_vat'] = true;
         }
 
-        if ($type != 'api') {
-            $priceFields['use_currency'] = true;
-        } else {
-            $priceFields['use_currency'] = false;
-        }
+        $priceFields['use_currency'] = true;
 
         if ($this->getStoreValue(self::XPATH_TAX_INCLUDE_BOTH)) {
             $priceFields['tax_include_both'] = true;
@@ -744,12 +654,6 @@ class Source extends AbstractHelper
         return $priceFields;
     }
 
-    /**
-     * @param $type
-     *
-     * @return array
-     * @throws LocalizedException
-     */
     public function getInventoryData($type)
     {
         $invAtt = [];
@@ -761,10 +665,6 @@ class Source extends AbstractHelper
         $invAtt['config_manage_stock'] = $this->getStoreValue(self::XPATH_MANAGE_STOCK);
 
         if (!$enabled || empty($fields)) {
-
-            if ($type == 'api') {
-                $invAtt['attributes'][] = 'qty';
-            }
             return $invAtt;
         }
 
@@ -801,14 +701,6 @@ class Source extends AbstractHelper
         return $invAtt;
     }
 
-    /**
-     * @param                                $dataRow
-     * @param \Magento\Catalog\Model\Product $product
-     * @param \Magento\Catalog\Model\Product $parent
-     * @param                                $config
-     *
-     * @return array
-     */
     public function reformatData($dataRow, $product, $parent, $config)
     {
         if (!empty($config['categories'])) {
@@ -821,20 +713,10 @@ class Source extends AbstractHelper
                 $dataRow = array_merge($dataRow, $imageData);
             }
         }
-        if ($deliveryTime = $this->getDeliveryTime($dataRow, $config)) {
-            $dataRow = array_merge($dataRow, $deliveryTime);
-        }
 
         return $dataRow;
     }
 
-    /**
-     * @param \Magento\Catalog\Model\Product $product
-     * @param \Magento\Catalog\Model\Product $parent
-     * @param                                $categories
-     *
-     * @return array
-     */
     public function getCategoryData($product, $parent, $categories)
     {
         $path = [];
@@ -869,11 +751,6 @@ class Source extends AbstractHelper
         return [];
     }
 
-    /**
-     * @param $dataRow
-     *
-     * @return array
-     */
     public function getImageData($dataRow)
     {
         $i = 0;
@@ -894,35 +771,5 @@ class Source extends AbstractHelper
         }
 
         return $imageData;
-    }
-
-    /**
-     * @param $dataRow
-     * @param $config
-     *
-     * @return array|bool
-     */
-    public function getDeliveryTime($dataRow, $config)
-    {
-        if (!empty($config['delivery'])) {
-            $deliveryTime = [];
-            $stock = 'in_stock';
-            if (!empty($dataRow['availability'])) {
-                if ($dataRow['availability'] == 'out of stock') {
-                    $stock = 'out_of_stock';
-                }
-            }
-            $countries = $this->generalHelper->getValueArray($config['delivery']);
-            if (is_array($countries)) {
-                foreach ($countries as $country) {
-                    if (!empty($country[$stock])) {
-                        $deliveryTime['delivery_period_' . strtolower($country['code'])] = $country[$stock];
-                    }
-                }
-            }
-            return $deliveryTime;
-        }
-
-        return false;
     }
 }

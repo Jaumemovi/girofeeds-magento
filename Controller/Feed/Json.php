@@ -1,42 +1,25 @@
 <?php
-/**
- * Copyright © Magmodules.eu. All rights reserved.
- * See COPYING.txt for license details.
- */
+
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Controller\Feed;
+namespace Girofeeds\ProductApi\Controller\Feed;
 
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
-use Magmodules\Channable\Helper\Feed as FeedHelper;
-use Magmodules\Channable\Helper\General as GeneralHelper;
-use Magmodules\Channable\Model\Generate as GenerateModel;
+use Girofeeds\ProductApi\Helper\Feed as FeedHelper;
+use Girofeeds\ProductApi\Helper\General as GeneralHelper;
+use Girofeeds\ProductApi\Model\Generate as GenerateModel;
 use Magento\Framework\App\Response\Http as HttpResponse;
 
 class Json extends Action
 {
-    /**
-     * @var GenerateModel
-     */
+
     private $generateModel;
-    /**
-     * @var GeneralHelper
-     */
     private $generalHelper;
-    /**
-     * @var FeedHelper
-     */
     private $feedHelper;
-    /**
-     * @var JsonFactory
-     */
     private $resultJsonFactory;
-    /**
-     * @var RemoteAddress
-     */
     private $remoteAddress;
 
     public function __construct(
@@ -66,15 +49,21 @@ class Json extends Action
         $this->setNoCacheHeaders();
 
         if (empty($storeId) || empty($token)) {
-            return $result->setData([]);
+            return $result->setData(
+                $this->buildErrorResponse('missing_params', 'Store ID and token are required.')
+            );
         }
 
         if (!$this->generalHelper->getEnabled($storeId)) {
-            return $result->setData([]);
+            return $result->setData(
+                $this->buildErrorResponse('module_disabled', 'Module is not enabled for this store.')
+            );
         }
 
         if ($token !== $this->generalHelper->getToken()) {
-            return $result->setData([]);
+            return $result->setData(
+                $this->buildErrorResponse('invalid_token', 'The provided token is invalid.')
+            );
         }
 
         $productId = $this->getRequest()->getParam('pid');
@@ -88,13 +77,23 @@ class Json extends Action
             return $result->setData($data ?: []);
         } catch (\Exception $e) {
             $this->generalHelper->addTolog('Generate', $e->getMessage());
-            return $result->setData(['error' => $e->getMessage()]);
+            return $result->setData(
+                $this->buildErrorResponse('generation_error', $e->getMessage())
+            );
         }
     }
 
-    /**
-     * Add headers to prevent caching by Varnish or browser
-     */
+    private function buildErrorResponse(string $code, string $message): array
+    {
+        return [
+            'success' => false,
+            'error' => [
+                'code' => $code,
+                'message' => $message,
+            ],
+        ];
+    }
+
     private function setNoCacheHeaders(): void
     {
         /** @var HttpResponse $response */

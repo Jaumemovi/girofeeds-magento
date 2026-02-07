@@ -29,7 +29,6 @@
     <type name="Magento\Framework\Console\CommandList">
         <arguments>
             <argument name="commands" xsi:type="array">
-                <item name="GirofeedsSelftest" xsi:type="object">Girofeeds\ProductApi\Console\Command\Selftest</item>
                 <item name="GirofeedsGenerateToken" xsi:type="object">Girofeeds\ProductApi\Console\Command\GenerateToken</item>
             </argument>
         </arguments>

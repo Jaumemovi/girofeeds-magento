@@ -1,125 +1,55 @@
 <?php
-/**
- * Copyright © Magmodules.eu. All rights reserved.
- * See COPYING.txt for license details.
- */
 
-namespace Magmodules\Channable\Model;
+declare(strict_types=1);
+
+namespace Girofeeds\ProductApi\Model;
 
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Framework\App\Area;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Store\Model\App\Emulation;
-use Magmodules\Channable\Helper\Feed as FeedHelper;
-use Magmodules\Channable\Helper\General as GeneralHelper;
-use Magmodules\Channable\Helper\Product as ProductHelper;
-use Magmodules\Channable\Helper\Source as SourceHelper;
-use Magmodules\Channable\Model\Collection\Products as ProductsModel;
-use Magmodules\Channable\Model\Item as ItemModel;
-use Magmodules\Channable\Service\Product\TierPriceData;
-use Magmodules\Channable\Service\Category\CategoryData;
-use Magmodules\Channable\Service\Product\CustomOptions;
+use Girofeeds\ProductApi\Helper\Feed as FeedHelper;
+use Girofeeds\ProductApi\Helper\General as GeneralHelper;
+use Girofeeds\ProductApi\Helper\Product as ProductHelper;
+use Girofeeds\ProductApi\Helper\Source as SourceHelper;
+use Girofeeds\ProductApi\Model\Collection\Products as ProductsModel;
+use Girofeeds\ProductApi\Service\Category\CategoryData;
 
 class Generate
 {
 
-    /**
-     * @var ProductsModel
-     */
     private $productModel;
-    /**
-     * @var Item
-     */
-    private $itemModel;
-    /**
-     * @var ProductHelper
-     */
     private $productHelper;
-    /**
-     * @var SourceHelper
-     */
     private $sourceHelper;
-    /**
-     * @var GeneralHelper
-     */
     private $generalHelper;
-    /**
-     * @var FeedHelper
-     */
     private $feedHelper;
-    /**
-     * @var TierPriceData
-     */
-    private $tierPriceData;
-    /**
-     * @var CustomOptions
-     */
-    private $customOptions;
-    /**
-     * @var CategoryData
-     */
     private $categoryData;
-    /**
-     * @var Emulation
-     */
     private $appEmulation;
 
-    /**
-     * Generate constructor.
-     *
-     * @param ProductsModel $productModel
-     * @param Item $itemModel
-     * @param SourceHelper $sourceHelper
-     * @param ProductHelper $productHelper
-     * @param GeneralHelper $generalHelper
-     * @param FeedHelper $feedHelper
-     * @param TierPriceData $tierPriceData
-     * @param CustomOptions $customOptions
-     * @param CategoryData $categoryData
-     * @param Emulation $appEmulation
-     */
     public function __construct(
         ProductsModel $productModel,
-        ItemModel $itemModel,
         SourceHelper $sourceHelper,
         ProductHelper $productHelper,
         GeneralHelper $generalHelper,
         FeedHelper $feedHelper,
-        TierPriceData $tierPriceData,
-        CustomOptions $customOptions,
         CategoryData $categoryData,
         Emulation $appEmulation
     ) {
         $this->productModel = $productModel;
         $this->productHelper = $productHelper;
-        $this->itemModel = $itemModel;
         $this->sourceHelper = $sourceHelper;
         $this->generalHelper = $generalHelper;
         $this->feedHelper = $feedHelper;
-        $this->tierPriceData = $tierPriceData;
         $this->categoryData = $categoryData;
-        $this->customOptions = $customOptions;
         $this->appEmulation = $appEmulation;
     }
 
-    /**
-     * Generate feed by store
-     *
-     * @param int $storeId
-     * @param int|null $page
-     * @param array|null $productIds
-     * @param string|null $currency
-     * @param string|null $type
-     * @return array
-     * @throws LocalizedException
-     */
     public function generateByStore(
         int $storeId,
         ?int $page,
         ?array $productIds = [],
-        ?string $currency = null,
-        ?string $type = 'feed'
+        ?string $currency = null
     ): array {
         $feed = [];
         $pages = 1;
@@ -127,7 +57,7 @@ class Generate
         $timeStart = microtime(true);
         $this->appEmulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
 
-        $config = $this->sourceHelper->getConfig($storeId, $type, $currency);
+        $config = $this->sourceHelper->getConfig($storeId, 'feed', $currency);
         $productCollection = $this->productModel->getCollection($config, $page, $productIds);
         $size = $productCollection->getSize();
 
@@ -164,9 +94,6 @@ class Generate
                 }
                 if ($dataRow = $this->getDataRow($product, $parent, $config)) {
                     $feed[] = $dataRow;
-                    if (!empty($config['item_updates'])) {
-                        $this->itemModel->add($dataRow, $storeId);
-                    }
                 }
             }
 
@@ -193,13 +120,6 @@ class Generate
         return $feed;
     }
 
-    /**
-     * Calculate size for product collection
-     *
-     * @param int $storeId
-     *
-     * @return int
-     */
     public function getSize(int $storeId): int
     {
         try {
@@ -216,13 +136,6 @@ class Generate
         return $size;
     }
 
-    /**
-     * @param $product
-     * @param $parent
-     * @param $config
-     *
-     * @return null|array
-     */
     public function getDataRow($product, $parent, $config): ?array
     {
         if ($dataRow = $this->productHelper->getDataRow($product, $parent, $config)) {
@@ -234,15 +147,6 @@ class Generate
         return null;
     }
 
-    /**
-     * Prefetches data to reduce amount of queries required.
-     * This increases performance by a lot for environments with >1ms latency to database.
-     *
-     * @param ProductCollection $products
-     * @param ProductCollection $parents
-     * @param array $config
-     * @return void
-     */
     private function prefetchData(
         ProductCollection $products,
         ProductCollection $parents,
@@ -250,11 +154,5 @@ class Generate
     ) {
         $this->productHelper->getInventoryData()->load($products->getColumnValues('sku'), $config);
         $this->productHelper->getMediaData()->load($products, $parents);
-        if (in_array('tier_price', array_column($config['attributes'], 'source'))) {
-            $this->tierPriceData->load($products, $parents, $config['website_id']);
-        }
-        if (in_array('custom_options', array_column($config['attributes'], 'source'))) {
-            $this->customOptions->load($products, $parents, $config['store_id']);
-        }
     }
 }

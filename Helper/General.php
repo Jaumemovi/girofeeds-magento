@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Helper;
+namespace Girofeeds\ProductApi\Helper;
 
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\App\Helper\Context;
@@ -15,24 +15,23 @@ use Magento\Store\Model\ScopeInterface;
 use Magento\Config\Model\ResourceModel\Config as ConfigData;
 use Magento\Config\Model\ResourceModel\Config\Data\CollectionFactory as ConfigDataCollectionFactory;
 use Magento\Framework\App\ProductMetadataInterface;
-use Magmodules\Channable\Api\Log\RepositoryInterface as LogRepository;
+use Girofeeds\ProductApi\Api\Log\RepositoryInterface as LogRepository;
 use Magento\Framework\App\ProductMetadata;
 use Magento\Framework\Unserialize\Unserialize;
 
 /**
  * Class General
  *
- * @package Magmodules\Channable\Helper
+ * @package Girofeeds\ProductApi\Helper
  */
 class General extends AbstractHelper
 {
 
-    const MODULE_CODE = 'Magmodules_Channable';
-    const XPATH_EXTENSION_ENABLED = 'magmodules_channable/general/enable';
-    const XPATH_EXTENSION_VERSION = 'magmodules_channable/general/version';
-    const XPATH_MARKETPLACE_ENABLE = 'magmodules_channable_marketplace/general/enable';
-    const XPATH_TOKEN = 'magmodules_channable/general/token';
-    const XPATH_USE_ROW_ID = 'magmodules_channable/advanced/use_row_id';
+    const MODULE_CODE = 'Girofeeds_ProductApi';
+    const XPATH_EXTENSION_ENABLED = 'girofeeds_productapi/general/enable';
+    const XPATH_EXTENSION_VERSION = 'girofeeds_productapi/general/version';
+    const XPATH_TOKEN = 'girofeeds_productapi/general/token';
+    const XPATH_USE_ROW_ID = 'girofeeds_productapi/advanced/use_row_id';
 
     /**
      * @var ProductMetadataInterface
@@ -301,22 +300,6 @@ class General extends AbstractHelper
         return $storeIds;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getMarketplaceEnabled()
-    {
-        return $this->getStoreValue(self::XPATH_MARKETPLACE_ENABLE);
-    }
-
-    /**
-     * @return mixed
-     * @deprecated
-     */
-    public function getGmtDate()
-    {
-        return $this->getDateTime();
-    }
 
     /**
      * @return string
