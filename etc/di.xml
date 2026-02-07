@@ -4,6 +4,8 @@
                 type="Girofeeds\ProductApi\Model\Config\Repository"/>
     <preference for="Girofeeds\ProductApi\Api\Log\RepositoryInterface"
                 type="Girofeeds\ProductApi\Model\Log\Repository"/>
+    <preference for="Girofeeds\ProductApi\Api\UpdateProductInterface"
+                type="Girofeeds\ProductApi\Model\UpdateProduct"/>
 
     <type name="Girofeeds\ProductApi\Logger\ErrorLogger">
         <arguments>
