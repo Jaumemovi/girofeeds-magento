@@ -256,52 +256,6 @@ class General extends AbstractHelper
     }
 
     /**
-     * @param $path
-     *
-     * @return array
-     */
-    public function getEnabledArray($path)
-    {
-        $storeIds = [];
-        $stores = $this->storeManager->getStores();
-        foreach ($stores as $store) {
-            if ($this->getStoreValue($path, $store->getId())) {
-                if ($this->getEnabled($store->getId())) {
-                    $storeIds[] = $store->getId();
-                }
-            }
-        }
-
-        return $storeIds;
-    }
-
-    /**
-     * General check if Extension is enabled
-     *
-     * @param null $storeId
-     *
-     * @return mixed
-     */
-    public function getEnabled($storeId = null)
-    {
-        return $this->getStoreValue(self::XPATH_EXTENSION_ENABLED, $storeId);
-    }
-
-    /**
-     * @return array
-     */
-    public function getAllStoreIds()
-    {
-        $storeIds = [];
-        $stores = $this->storeManager->getStores();
-        foreach ($stores as $store) {
-            $storeIds[] = $store->getId();
-        }
-        return $storeIds;
-    }
-
-
-    /**
      * @return string
      */
     public function getDateTime()
@@ -331,14 +285,6 @@ class General extends AbstractHelper
         }
 
         return $this->localeDate->date()->format('Y-m-d H:i:s');
-    }
-
-    /**
-     * @return int
-     */
-    public function getTimestamp()
-    {
-        return $this->coreDate->gmtTimestamp();
     }
 
     /**

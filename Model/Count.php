@@ -16,23 +16,45 @@ class Count implements CountInterface
     private Generate $generateModel;
     private RequestInterface $request;
     private StoreManagerInterface $storeManager;
+    private ApiKeyValidator $apiKeyValidator;
+    private RateLimiter $rateLimiter;
 
     public function __construct(
         Generate $generateModel,
         RequestInterface $request,
-        StoreManagerInterface $storeManager
+        StoreManagerInterface $storeManager,
+        ApiKeyValidator $apiKeyValidator,
+        RateLimiter $rateLimiter
     ) {
         $this->generateModel = $generateModel;
         $this->request = $request;
         $this->storeManager = $storeManager;
+        $this->apiKeyValidator = $apiKeyValidator;
+        $this->rateLimiter = $rateLimiter;
     }
 
     public function getCount(): string
     {
-        try {
-            $storeId = $this->resolveStoreId();
-            $count = $this->generateModel->getSize($storeId);
+        $token = $this->request->getParam('key');
+        $storeId = $this->resolveStoreId();
 
+        $validation = $this->apiKeyValidator->validate($token, $storeId);
+        if (!$validation['valid']) {
+            return json_encode([
+                'status' => 'error',
+                'message' => $validation['message'],
+            ]);
+        }
+
+        if ($token && !$this->rateLimiter->isAllowed($token)) {
+            return json_encode([
+                'status' => 'error',
+                'message' => 'Rate limit exceeded',
+            ]);
+        }
+
+        try {
+            $count = $this->generateModel->getSize($storeId);
             return json_encode(['count' => (int) $count]);
         } catch (\Exception $e) {
             return json_encode([

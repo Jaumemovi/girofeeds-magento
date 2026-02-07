@@ -1,66 +1,55 @@
 <?php
-/**
- * Copyright © 2019 Magmodules.eu. All rights reserved.
- * See COPYING.txt for license details.
- */
 
-namespace Magmodules\Channable\Observer\Catalog;
+declare(strict_types=1);
+
+namespace Girofeeds\ProductApi\Observer\Catalog;
 
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
-use Magmodules\Channable\Model\Item as ItemModel;
-use Magmodules\Channable\Helper\Item as ItemHelper;
+use Girofeeds\ProductApi\Logger\DebugLogger;
+use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Store\Model\ScopeInterface;
 
-/**
- * Class ProductSaveAfter
- *
- * @package Magmodules\Channable\Observer\Catalog
- */
 class ProductSaveAfter implements ObserverInterface
 {
 
-    const OBSERVER_TYPE = 'ProductSaveAfter';
-    /**
-     * @var ItemModel
-     */
-    private $itemModel;
-    /**
-     * @var ItemHelper
-     */
-    private $itemHelper;
+    private const XML_PATH_DEBUG = 'girofeeds_productapi/general/debug';
 
-    /**
-     * ProductSaveAfter constructor.
-     *
-     * @param ItemModel  $itemModel
-     * @param ItemHelper $itemHelper
-     */
+    private DebugLogger $debugLogger;
+    private ScopeConfigInterface $scopeConfig;
+
     public function __construct(
-        ItemModel $itemModel,
-        ItemHelper $itemHelper
+        DebugLogger $debugLogger,
+        ScopeConfigInterface $scopeConfig
     ) {
-        $this->itemModel = $itemModel;
-        $this->itemHelper = $itemHelper;
+        $this->debugLogger = $debugLogger;
+        $this->scopeConfig = $scopeConfig;
     }
 
-    /**
-     * @param Observer $observer
-     *
-     * @return $this
-     */
-    public function execute(Observer $observer)
+    public function execute(Observer $observer): void
     {
-        if (!$this->itemHelper->invalidateByObserver()) {
-            return $this;
+        if (!$this->isDebugEnabled()) {
+            return;
         }
 
         try {
             $product = $observer->getData('product');
-            $this->itemModel->invalidateProduct($product->getId(), self::OBSERVER_TYPE);
+            if ($product && $product->getId()) {
+                $this->debugLogger->addLog(
+                    'ProductSaveAfter',
+                    sprintf('Product ID %s (%s) saved', $product->getId(), $product->getSku())
+                );
+            }
         } catch (\Exception $e) {
-            $this->itemHelper->addTolog(self::OBSERVER_TYPE, $e->getMessage());
+            $this->debugLogger->addLog('ProductSaveAfter', 'Error: ' . $e->getMessage());
         }
+    }
 
-        return $this;
+    private function isDebugEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_DEBUG,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 }

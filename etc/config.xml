@@ -38,8 +38,8 @@
                 <grouped>parent</grouped>
             </types>
             <filter>
-                <visbility_enabled>1</visbility_enabled>
-                <visbility>2,4</visbility>
+                <visibility_enabled>1</visibility_enabled>
+                <visibility>2,4</visibility>
                 <stock>0</stock>
             </filter>
         </girofeeds_productapi>

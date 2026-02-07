@@ -34,6 +34,8 @@ class UpdateProduct implements UpdateProductInterface
     private StockUpdater $stockUpdater;
     private ImageUpdater $imageUpdater;
     private CategoryUpdater $categoryUpdater;
+    private ApiKeyValidator $apiKeyValidator;
+    private RateLimiter $rateLimiter;
 
     public function __construct(
         RequestInterface $request,
@@ -47,7 +49,9 @@ class UpdateProduct implements UpdateProductInterface
         PriceUpdater $priceUpdater,
         StockUpdater $stockUpdater,
         ImageUpdater $imageUpdater,
-        CategoryUpdater $categoryUpdater
+        CategoryUpdater $categoryUpdater,
+        ApiKeyValidator $apiKeyValidator,
+        RateLimiter $rateLimiter
     ) {
         $this->request = $request;
         $this->productRepository = $productRepository;
@@ -61,10 +65,23 @@ class UpdateProduct implements UpdateProductInterface
         $this->stockUpdater = $stockUpdater;
         $this->imageUpdater = $imageUpdater;
         $this->categoryUpdater = $categoryUpdater;
+        $this->apiKeyValidator = $apiKeyValidator;
+        $this->rateLimiter = $rateLimiter;
     }
 
     public function execute(): string
     {
+        $token = $this->request->getParam('key');
+
+        $validation = $this->apiKeyValidator->validate($token);
+        if (!$validation['valid']) {
+            return $this->buildResponse('error', $validation['message'], [], [], [], null, [$validation['message']]);
+        }
+
+        if ($token && !$this->rateLimiter->isAllowed($token)) {
+            return $this->buildResponse('error', 'Rate limit exceeded', [], [], [], null, ['Rate limit exceeded']);
+        }
+
         try {
             $body = $this->request->getContent();
             $data = json_decode($body, true);

@@ -8,6 +8,7 @@ use Girofeeds\ProductApi\Api\TestInterface;
 use Girofeeds\ProductApi\Helper\General as GeneralHelper;
 use Girofeeds\ProductApi\Helper\Source as SourceHelper;
 use Magento\Framework\App\ProductMetadataInterface;
+use Magento\Framework\App\RequestInterface;
 use Magento\Store\Model\StoreManagerInterface;
 
 class Test implements TestInterface
@@ -18,23 +19,49 @@ class Test implements TestInterface
     private ProductMetadataInterface $productMetadata;
     private StoreManagerInterface $storeManager;
     private Generate $generateModel;
+    private RequestInterface $request;
+    private ApiKeyValidator $apiKeyValidator;
+    private RateLimiter $rateLimiter;
 
     public function __construct(
         GeneralHelper $generalHelper,
         SourceHelper $sourceHelper,
         ProductMetadataInterface $productMetadata,
         StoreManagerInterface $storeManager,
-        Generate $generateModel
+        Generate $generateModel,
+        RequestInterface $request,
+        ApiKeyValidator $apiKeyValidator,
+        RateLimiter $rateLimiter
     ) {
         $this->generalHelper = $generalHelper;
         $this->sourceHelper = $sourceHelper;
         $this->productMetadata = $productMetadata;
         $this->storeManager = $storeManager;
         $this->generateModel = $generateModel;
+        $this->request = $request;
+        $this->apiKeyValidator = $apiKeyValidator;
+        $this->rateLimiter = $rateLimiter;
     }
 
     public function test(): string
     {
+        $token = $this->request->getParam('key');
+
+        $validation = $this->apiKeyValidator->validate($token);
+        if (!$validation['valid']) {
+            return json_encode([
+                'status' => 'error',
+                'message' => $validation['message'],
+            ]);
+        }
+
+        if ($token && !$this->rateLimiter->isAllowed($token)) {
+            return json_encode([
+                'status' => 'error',
+                'message' => 'Rate limit exceeded',
+            ]);
+        }
+
         try {
             $storeId = (int) $this->storeManager->getStore()->getId();
             $storeCode = $this->storeManager->getStore()->getCode();

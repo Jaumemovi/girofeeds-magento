@@ -31,8 +31,8 @@ class Source extends AbstractHelper
     const XPATH_GENDER_SOURCE = 'girofeeds_productapi/data/gender_attribute';
     const XPATH_EXTRA_FIELDS = 'girofeeds_productapi/advanced/extra_fields';
     const XPATH_WEIGHT_UNIT = 'general/locale/weight_unit';
-    const XPATH_VISBILITY = 'girofeeds_productapi/filter/visbility_enabled';
-    const XPATH_VISIBILITY_OPTIONS = 'girofeeds_productapi/filter/visbility';
+    const XPATH_VISBILITY = 'girofeeds_productapi/filter/visibility_enabled';
+    const XPATH_VISIBILITY_OPTIONS = 'girofeeds_productapi/filter/visibility';
     const XPATH_STOCK = 'girofeeds_productapi/filter/stock';
     const XPATH_INVENTORY = 'girofeeds_productapi/advanced/inventory';
     const XPATH_INVENTORY_DATA = 'girofeeds_productapi/advanced/inventory_fields';

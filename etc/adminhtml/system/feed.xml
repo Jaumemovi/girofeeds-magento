@@ -277,17 +277,17 @@
                 <label>Filter by Visibility</label>
                 <frontend_model>Girofeeds\ProductApi\Block\Adminhtml\Design\Heading</frontend_model>
             </field>
-            <field id="visbility_enabled" translate="label" type="select" sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">
+            <field id="visibility_enabled" translate="label" type="select" sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Enable</label>
                 <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                <config_path>girofeeds_productapi/filter/visbility_enabled</config_path>
+                <config_path>girofeeds_productapi/filter/visibility_enabled</config_path>
             </field>
-            <field id="visbility" translate="label" type="multiselect" sortOrder="3" showInDefault="1" showInWebsite="1" showInStore="1">
+            <field id="visibility" translate="label" type="multiselect" sortOrder="3" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Allowed Visibility</label>
                 <source_model>Girofeeds\ProductApi\Model\System\Config\Source\ProductVisibility</source_model>
-                <config_path>girofeeds_productapi/filter/visbility</config_path>
+                <config_path>girofeeds_productapi/filter/visibility</config_path>
                 <depends>
-                    <field id="visbility_enabled">1</field>
+                    <field id="visibility_enabled">1</field>
                 </depends>
             </field>
             <field id="heading_category" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
