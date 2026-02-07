@@ -1,90 +1,47 @@
 <?xml version="1.0"?>
-<!--
-/**
- * Copyright © Magmodules.eu. All rights reserved.
- * See COPYING.txt for license details.
- */
--->
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
     <default>
-        <magmodules_channable>
+        <girofeeds_productapi>
             <general>
-                <enable>0</enable>
-                <limit>250</limit>
-                <version>v1.23.0</version>
+                <enable>1</enable>
+                <limit>100</limit>
+                <add_disabled>0</add_disabled>
+                <stock>1</stock>
             </general>
             <data>
                 <name_attribute>name</name_attribute>
                 <description_attribute>description</description_attribute>
+                <short_description_attribute>short_description</short_description_attribute>
                 <brand_attribute>manufacturer</brand_attribute>
-                <ean_attribute>sku</ean_attribute>
-                <image>image</image>
-                <sku_attribute>sku</sku_attribute>
-                <size_attribute>size</size_attribute>
+                <ean_attribute/>
                 <color_attribute>color</color_attribute>
+                <size_attribute>size</size_attribute>
                 <material_attribute>material</material_attribute>
                 <gender_attribute>gender</gender_attribute>
+                <image>all</image>
+                <main_image>image</main_image>
+                <hidden_images>0</hidden_images>
+                <sku_attribute>sku</sku_attribute>
             </data>
+            <advanced>
+                <tax>1</tax>
+                <tax_include_both>1</tax_include_both>
+                <inventory>1</inventory>
+                <inventory_fields>min_sale_qty,backorders</inventory_fields>
+            </advanced>
             <types>
                 <configurable>simple</configurable>
                 <configurable_link>1</configurable_link>
                 <configurable_image>2</configurable_image>
-                <configurable_parent_atts>description</configurable_parent_atts>
-                <configurable_nonvisible>1</configurable_nonvisible>
                 <bundle>parent</bundle>
                 <grouped>parent</grouped>
             </types>
-        </magmodules_channable>
-        <magmodules_channable_marketplace>
-            <general>
-                <enable>0</enable>
-            </general>
-            <order>
-                <shipping_method>flatrate_flatrate</shipping_method>
-                <shipping_method_fallback>flatrate_flatrate</shipping_method_fallback>
-                <import_customer>0</import_customer>
-                <orderid_prefix>M-</orderid_prefix>
-                <orderid_alphanumeric>1</orderid_alphanumeric>
-                <import_company_name>1</import_company_name>
-                <invoice_order_email>0</invoice_order_email>
-                <deduct_fpt>0</deduct_fpt>
-                <transaction_fee>1</transaction_fee>
-                <import_grouped_products>0</import_grouped_products>
-                <import_bundle_products>0</import_bundle_products>
-            </order>
-            <returns>
-                <show_on_creditmemo>1</show_on_creditmemo>
-                <auto_match>1</auto_match>
-                <auto_process_complete>0</auto_process_complete>
-            </returns>
-            <item>
-                <enable>0</enable>
-                <limit>50</limit>
-                <cron>0</cron>
-            </item>
-        </magmodules_channable_marketplace>
-        <payment>
-            <channable>
-                <active>1</active>
-                <model>Magmodules\Channable\Model\Payment\Channable</model>
-                <order_status>pending</order_status>
-                <title>Channable Payment</title>
-                <allowspecific>0</allowspecific>
-            </channable>
-        </payment>
-        <carriers>
-            <channable>
-                <active>1</active>
-                <sallowspecific>0</sallowspecific>
-                <model>Magmodules\Channable\Model\Carrier\Channable</model>
-                <name>Channable Shipping</name>
-                <title>Channable</title>
-                <price>0.00</price>
-                <type>I</type>
-                <overwrite_title>0</overwrite_title>
-                <overwrite_name>0</overwrite_name>
-            </channable>
-        </carriers>
+            <filter>
+                <visbility_enabled>1</visbility_enabled>
+                <visbility>2,4</visbility>
+                <stock>0</stock>
+            </filter>
+        </girofeeds_productapi>
     </default>
 </config>

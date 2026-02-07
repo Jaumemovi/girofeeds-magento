@@ -1,128 +1,19 @@
 {
-    "channable_orders": {
+    "girofeeds_api_log": {
         "column": {
             "entity_id": true,
-            "channable_id": true,
-            "channel_name": true,
-            "order_status": true,
-            "channel_label": true,
-            "channel_id": true,
-            "channable_order_status": true,
-            "is_test": true,
-            "products": true,
-            "customer": true,
-            "billing": true,
-            "shipping": true,
-            "price": true,
-            "magento_order_id": true,
-            "magento_increment_id": true,
-            "store_id": true,
-            "status": true,
-            "error_msg": true,
-            "created_at": true,
-            "updated_at": true,
-            "attempts": true,
-            "shipment_method": true
+            "timestamp": true,
+            "ip_address": true,
+            "endpoint": true,
+            "api_key_hash": true,
+            "response_status": true,
+            "execution_time_ms": true
         },
         "index": {
-            "FTI_489FA236241E26B3CF278097F9ADE3E4": true,
-            "CHANNABLE_ORDERS_CHANNABLE_ID": true,
-            "CHANNABLE_ORDERS_MAGENTO_ORDER_ID": true
+            "GIROFEEDS_API_LOG_TIMESTAMP": true
         },
         "constraint": {
             "PRIMARY": true
-        }
-    },
-    "channable_items": {
-        "column": {
-            "item_id": true,
-            "store_id": true,
-            "id": true,
-            "parent_id": true,
-            "gtin": true,
-            "title": true,
-            "price": true,
-            "discount_price": true,
-            "qty": true,
-            "is_in_stock": true,
-            "call_result": true,
-            "status": true,
-            "needs_update": true,
-            "exclude_for_update": true,
-            "created_at": true,
-            "updated_at": true,
-            "last_call": true
-        },
-        "index": {
-            "CHANNABLE_ITEMS_STORE_ID_ID_NEEDS_UPDATE_UPDATED_AT": true,
-            "CHANNABLE_ITEMS_STORE_ID": true,
-            "CHANNABLE_ITEMS_NEEDS_UPDATE": true,
-            "CHANNABLE_ITEMS_EXCLUDE_FOR_UPDATE": true
-        },
-        "constraint": {
-            "PRIMARY": true
-        }
-    },
-    "channable_returns": {
-        "column": {
-            "store_id": true,
-            "order_id": true,
-            "channel_name": true,
-            "channel_id": true,
-            "channable_id": true,
-            "magento_order_id": true,
-            "magento_increment_id": true,
-            "item": true,
-            "customer_name": true,
-            "customer": true,
-            "address": true,
-            "reason": true,
-            "comment": true,
-            "status": true,
-            "created_at": true,
-            "updated_at": true,
-            "entity_id": true,
-            "id": true,
-            "magento_creditmemo_id": true,
-            "magento_creditmemo_increment": true,
-            "magento_creditmemo_increment_id": true
-        },
-        "index": {
-            "IDX_8C173AFD5BA1C589364EB29DBD02F16B": true,
-            "CHANNABLE_RETURNS_CHANNABLE_ID": true,
-            "CHANNABLE_RETURNS_MAGENTO_ORDER_ID": true
-        },
-        "constraint": {
-            "PRIMARY": true
-        }
-    },
-    "quote": {
-        "column": {
-            "transaction_fee": true
-        }
-    },
-    "sales_order": {
-        "column": {
-            "transaction_fee": true,
-            "channable_pickup_location": true
-        }
-    },
-    "sales_order_grid": {
-        "column": {
-            "channable_id": true,
-            "channel_id": true,
-            "channel_name": true,
-            "channel_label": true
-        }
-    },
-    "sales_invoice": {
-        "column": {
-            "transaction_fee": true
-        }
-    },
-    "sales_creditmemo": {
-        "column": {
-            "transaction_fee": true
         }
     }
 }
