@@ -6,6 +6,10 @@
                 type="Girofeeds\ProductApi\Model\Log\Repository"/>
     <preference for="Girofeeds\ProductApi\Api\UpdateProductInterface"
                 type="Girofeeds\ProductApi\Model\UpdateProduct"/>
+    <preference for="Girofeeds\ProductApi\Api\CountInterface"
+                type="Girofeeds\ProductApi\Model\Count"/>
+    <preference for="Girofeeds\ProductApi\Api\TestInterface"
+                type="Girofeeds\ProductApi\Model\Test"/>
 
     <type name="Girofeeds\ProductApi\Logger\ErrorLogger">
         <arguments>
