@@ -5,7 +5,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Logger\Handler;
+namespace Girofeeds\ProductApi\Logger\Handler;
 
 use Magento\Framework\Logger\Handler\Base;
 use Monolog\Logger;
@@ -24,5 +24,5 @@ class Debug extends Base
     /**
      * @var string
      */
-    protected $fileName = '/var/log/channable-debug.log';
+    protected $fileName = '/var/log/girofeeds_debug.log';
 }

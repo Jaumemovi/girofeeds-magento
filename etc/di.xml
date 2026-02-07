@@ -36,6 +36,7 @@
         <arguments>
             <argument name="commands" xsi:type="array">
                 <item name="GirofeedsGenerateToken" xsi:type="object">Girofeeds\ProductApi\Console\Command\GenerateToken</item>
+                <item name="GirofeedsSelftest" xsi:type="object">Girofeeds\ProductApi\Console\Command\Selftest</item>
             </argument>
         </arguments>
     </type>

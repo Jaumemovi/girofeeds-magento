@@ -5,9 +5,9 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Service\Token;
+namespace Girofeeds\ProductApi\Service\Token;
 
-use Magmodules\Channable\Api\Config\RepositoryInterface as ConfigProvider;
+use Girofeeds\ProductApi\Api\Config\RepositoryInterface as ConfigProvider;
 
 class Generate
 {
@@ -43,12 +43,6 @@ class Generate
      */
     private function getRandomString(): string
     {
-        $token = '';
-        $chars = str_split("abcdefghijklmnopqrstuvwxyz0123456789");
-        for ($i = 0; $i < 64; $i++) {
-            $token .= $chars[array_rand($chars)];
-        }
-
-        return $token;
+        return bin2hex(random_bytes(16));
     }
 }

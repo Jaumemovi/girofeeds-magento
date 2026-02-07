@@ -1,28 +1,41 @@
 <?php
-/**
- * Copyright © 2019 Magmodules.eu. All rights reserved.
- * See COPYING.txt for license details.
- */
 
-namespace Magmodules\Channable\Plugin;
+declare(strict_types=1);
+
+namespace Girofeeds\ProductApi\Plugin;
+
+use Magento\Framework\App\Request\CsrfValidator;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\ActionInterface;
 
 class AroundCsrfValidator
 {
-    /**
-     * @param \Magento\Framework\App\Request\CsrfValidator $subject
-     * @param \Closure $proceed
-     * @param \Magento\Framework\App\RequestInterface $request
-     * @param \Magento\Framework\App\ActionInterface $action
-     */
+
+    private const ALLOWED_ROUTES = [
+        'girofeeds_feed_json',
+        'girofeeds_updateproduct_index',
+        'girofeeds_count_index',
+        'girofeeds_test_index',
+    ];
+
     public function aroundValidate(
-        $subject,
+        CsrfValidator $subject,
         \Closure $proceed,
-        $request,
-        $action
-    ) {
-        if ($request->getModuleName() == 'channable') {
-            return;
+        RequestInterface $request,
+        ActionInterface $action
+    ): void {
+        if ($request->getModuleName() === 'girofeeds') {
+            $fullAction = sprintf(
+                '%s_%s_%s',
+                $request->getModuleName(),
+                $request->getControllerName(),
+                $request->getActionName()
+            );
+            if (in_array($fullAction, self::ALLOWED_ROUTES, true)) {
+                return;
+            }
         }
+
         $proceed($request, $action);
     }
 }

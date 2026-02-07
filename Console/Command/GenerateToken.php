@@ -5,15 +5,15 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Console\Command;
+namespace Girofeeds\ProductApi\Console\Command;
 
 use Magento\Framework\Console\Cli;
-use Magmodules\Channable\Api\Config\RepositoryInterface as ConfigProvider;
+use Girofeeds\ProductApi\Api\Config\RepositoryInterface as ConfigProvider;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Magmodules\Channable\Service\Token\Generate;
+use Girofeeds\ProductApi\Service\Token\Generate;
 
 class GenerateToken extends Command
 {
@@ -31,7 +31,7 @@ class GenerateToken extends Command
     /**
      * Command call name
      */
-    const COMMAND_NAME = 'channable:generate:token';
+    const COMMAND_NAME = 'girofeeds:token:generate';
 
     /**
      * @var Generate
@@ -61,7 +61,7 @@ class GenerateToken extends Command
     public function configure()
     {
         $this->setName(self::COMMAND_NAME);
-        $this->setDescription('Generate token for Channable connection');
+        $this->setDescription('Generate token for Girofeeds connection');
         $this->addOption(
             'force',
             null,

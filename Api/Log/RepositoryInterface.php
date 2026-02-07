@@ -5,7 +5,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Api\Log;
+namespace Girofeeds\ProductApi\Api\Log;
 
 /**
  * Log repository interface
@@ -21,7 +21,7 @@ interface RepositoryInterface
     /**
      * Log file path pattern
      */
-    public const LOG_FILE = '%s/log/channable-%s.log';
+    public const LOG_FILE = '%s/log/girofeeds_%s.log';
 
     /**
      * Add record to error log

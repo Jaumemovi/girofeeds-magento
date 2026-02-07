@@ -5,7 +5,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Logger\Handler;
+namespace Girofeeds\ProductApi\Logger\Handler;
 
 use Magento\Framework\Logger\Handler\Base;
 use Monolog\Logger;
@@ -24,5 +24,5 @@ class Error extends Base
     /**
      * @var string
      */
-    protected $fileName = '/var/log/channable-error.log';
+    protected $fileName = '/var/log/girofeeds_error.log';
 }

@@ -7,70 +7,79 @@ namespace Girofeeds\ProductApi\Controller\Test;
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
 use Girofeeds\ProductApi\Api\TestInterface;
-use Girofeeds\ProductApi\Helper\General as GeneralHelper;
+use Girofeeds\ProductApi\Model\ApiKeyValidator;
+use Girofeeds\ProductApi\Model\RateLimiter;
+use Girofeeds\ProductApi\Model\ApiLogger;
 use Magento\Framework\App\Response\Http as HttpResponse;
 
 class Index extends Action
 {
 
     private TestInterface $testModel;
-    private GeneralHelper $generalHelper;
     private JsonFactory $resultJsonFactory;
+    private RemoteAddress $remoteAddress;
+    private ApiKeyValidator $apiKeyValidator;
+    private RateLimiter $rateLimiter;
+    private ApiLogger $apiLogger;
 
     public function __construct(
         Context $context,
         TestInterface $testModel,
-        GeneralHelper $generalHelper,
-        JsonFactory $resultJsonFactory
+        JsonFactory $resultJsonFactory,
+        RemoteAddress $remoteAddress,
+        ApiKeyValidator $apiKeyValidator,
+        RateLimiter $rateLimiter,
+        ApiLogger $apiLogger
     ) {
         parent::__construct($context);
         $this->testModel = $testModel;
-        $this->generalHelper = $generalHelper;
         $this->resultJsonFactory = $resultJsonFactory;
+        $this->remoteAddress = $remoteAddress;
+        $this->apiKeyValidator = $apiKeyValidator;
+        $this->rateLimiter = $rateLimiter;
+        $this->apiLogger = $apiLogger;
     }
 
     public function execute()
     {
+        $startTime = microtime(true);
         $result = $this->resultJsonFactory->create();
         $this->setNoCacheHeaders();
 
         $token = $this->getRequest()->getParam('key');
+        $ip = $this->remoteAddress->getRemoteAddress();
+        $keyHash = ApiLogger::hashKey($token);
 
-        if (empty($token)) {
+        $validation = $this->apiKeyValidator->validate($token);
+        if (!$validation['valid']) {
+            $this->apiLogger->logRequest('test', $keyHash, $ip, $validation['code'], $this->elapsed($startTime));
             return $result->setData([
                 'status' => 'error',
-                'message' => 'Missing API key',
-                'errors' => ['The key parameter is required'],
+                'message' => $validation['message'],
             ]);
         }
 
-        if (!$this->generalHelper->getEnabled()) {
+        if (!$this->rateLimiter->isAllowed($token)) {
+            $this->apiLogger->logRequest('test', $keyHash, $ip, 429, $this->elapsed($startTime));
             return $result->setData([
                 'status' => 'error',
-                'message' => 'Module is not enabled',
-                'errors' => ['Girofeeds ProductApi module is disabled'],
-            ]);
-        }
-
-        if ($token !== $this->generalHelper->getToken()) {
-            return $result->setData([
-                'status' => 'error',
-                'message' => 'Invalid API key',
-                'errors' => ['The provided API key is invalid'],
+                'message' => 'Rate limit exceeded',
             ]);
         }
 
         try {
             $responseJson = $this->testModel->test();
             $responseData = json_decode($responseJson, true);
+            $this->apiLogger->logRequest('test', $keyHash, $ip, 200, $this->elapsed($startTime));
             return $result->setData($responseData);
         } catch (\Exception $e) {
-            $this->generalHelper->addTolog('Test', $e->getMessage());
+            $this->apiLogger->logError('test', $e->getMessage());
+            $this->apiLogger->logRequest('test', $keyHash, $ip, 500, $this->elapsed($startTime));
             return $result->setData([
                 'status' => 'error',
                 'message' => 'Internal error',
-                'errors' => [$e->getMessage()],
             ]);
         }
     }
@@ -82,5 +91,10 @@ class Index extends Action
         $response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0', true);
         $response->setHeader('Pragma', 'no-cache', true);
         $response->setHeader('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT', true);
+    }
+
+    private function elapsed(float $startTime): float
+    {
+        return (microtime(true) - $startTime) * 1000;
     }
 }
