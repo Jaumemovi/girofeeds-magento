@@ -571,7 +571,7 @@ public function addToLog($level, $message, array $context = [])
  */
 ```
 
-**Debe ser:**
+**Debes añadir debajo del copy de Magmodules:**
 ```php
 /**
  * Copyright © 2026 Girofeeds. All rights reserved.
