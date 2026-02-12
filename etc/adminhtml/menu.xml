@@ -6,7 +6,7 @@
              title="Girofeeds Product API"
              module="Girofeeds_ProductApi"
              sortOrder="500"
-             parent="Magento_Config::config"
+             parent="Magento_Backend::stores"
              resource="Girofeeds_ProductApi::config"
              action="adminhtml/system_config/edit/section/girofeeds_productapi"
         />
