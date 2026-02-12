@@ -451,6 +451,6 @@ class Products
     {
         $selectCountSql = $productCollection->getSelectCountSql();
         $connection = $this->resource->getConnection(ResourceConnection::DEFAULT_CONNECTION);
-        return $connection->fetchOne($selectCountSql);
+        return (int) $connection->fetchOne($selectCountSql);
     }
 }
