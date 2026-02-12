@@ -41,19 +41,19 @@ interface RepositoryInterface
     public function isEnabled(): bool;
 
     /**
-     * Get API token
+     * Get API key
      *
      * @return string|null
      */
-    public function getToken(): ?string;
+    public function getApiKey(): ?string;
 
     /**
-     * Set API token
+     * Set API key
      *
-     * @param string|null $token
+     * @param string|null $apiKey
      * @return void
      */
-    public function setToken(?string $token);
+    public function setApiKey(?string $apiKey);
 
     /**
      * Get store currency code

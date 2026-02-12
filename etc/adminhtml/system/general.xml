@@ -8,6 +8,31 @@
             <label>Branding</label>
             <frontend_model>Girofeeds\ProductApi\Block\Adminhtml\Design\Header</frontend_model>
         </group>
+        <group id="connection" translate="label comment" type="text" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>Connection Info</label>
+            <comment><![CDATA[Use the values below to connect this store in the Girofeeds application.]]></comment>
+            <attribute type="expanded">1</attribute>
+            <field id="store_domain" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Store Domain</label>
+                <frontend_model>Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field\StoreDomain</frontend_model>
+                <comment><![CDATA[Base URL of this store. Copy this value into the <strong>Store Domain</strong> field in Girofeeds.]]></comment>
+            </field>
+            <field id="api_key" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>API Key</label>
+                <config_path>girofeeds_productapi/general/api_key</config_path>
+                <comment><![CDATA[Copy this value into the <strong>API Key</strong> field in Girofeeds. To regenerate, run: <code>bin/magento girofeeds:token:generate --force=1</code>]]></comment>
+            </field>
+            <field id="module_version" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Module Version</label>
+                <frontend_model>Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field\ModuleVersion</frontend_model>
+                <comment><![CDATA[Copy this value into the <strong>Module Version</strong> field in Girofeeds.]]></comment>
+            </field>
+            <field id="store_views" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Store Views</label>
+                <frontend_model>Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field\StoreViews</frontend_model>
+                <comment><![CDATA[Available store view codes. Use the desired code in the <strong>Store View</strong> field in Girofeeds.]]></comment>
+            </field>
+        </group>
         <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>General</label>
             <attribute type="expanded">1</attribute>
@@ -15,12 +40,6 @@
                 <label>Enable Module</label>
                 <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 <config_path>girofeeds_productapi/general/enable</config_path>
-            </field>
-            <field id="api_key" translate="label comment" type="obscure" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
-                <label>API Key</label>
-                <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                <config_path>girofeeds_productapi/general/api_key</config_path>
-                <comment><![CDATA[API key used for authentication. Use the CLI command <code>bin/magento girofeeds:token:generate</code> to regenerate.]]></comment>
             </field>
             <field id="limit" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Products Per Page</label>

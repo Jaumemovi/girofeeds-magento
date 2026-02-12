@@ -24,7 +24,7 @@ use Magento\Store\Model\StoreManagerInterface;
 class BaseRepository
 {
 
-    const XML_PATH_TOKEN = 'girofeeds_productapi/general/token';
+    const XML_PATH_API_KEY = 'girofeeds_productapi/general/api_key';
 
     /**
      * @var Json
@@ -221,16 +221,16 @@ class BaseRepository
     /**
      * @inheritDoc
      */
-    public function getToken(): ?string
+    public function getApiKey(): ?string
     {
-        return $this->getStoreValue(self::XML_PATH_TOKEN);
+        return $this->getStoreValue(self::XML_PATH_API_KEY);
     }
 
     /**
      * @inheritDoc
      */
-    public function setToken(?string $token)
+    public function setApiKey(?string $apiKey)
     {
-        return $this->setConfigData($token, self::XML_PATH_TOKEN);
+        return $this->setConfigData($apiKey, self::XML_PATH_API_KEY);
     }
 }

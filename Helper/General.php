@@ -30,7 +30,7 @@ class General extends AbstractHelper
     const MODULE_CODE = 'Girofeeds_ProductApi';
     const XPATH_EXTENSION_ENABLED = 'girofeeds_productapi/general/enable';
     const XPATH_EXTENSION_VERSION = 'girofeeds_productapi/general/version';
-    const XPATH_TOKEN = 'girofeeds_productapi/general/token';
+    const XPATH_API_KEY = 'girofeeds_productapi/general/api_key';
     const XPATH_USE_ROW_ID = 'girofeeds_productapi/advanced/use_row_id';
 
     /**
@@ -120,9 +120,9 @@ class General extends AbstractHelper
     /**
      * @return mixed
      */
-    public function getToken()
+    public function getApiKey()
     {
-        return $this->getStoreValue(self::XPATH_TOKEN);
+        return $this->getStoreValue(self::XPATH_API_KEY);
     }
 
     /**

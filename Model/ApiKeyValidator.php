@@ -11,7 +11,7 @@ class ApiKeyValidator
 {
 
     private const XML_PATH_ENABLE = 'girofeeds_productapi/general/enable';
-    private const XML_PATH_API_KEY = 'girofeeds_productapi/general/token';
+    private const XML_PATH_API_KEY = 'girofeeds_productapi/general/api_key';
 
     /**
      * @var ScopeConfigInterface

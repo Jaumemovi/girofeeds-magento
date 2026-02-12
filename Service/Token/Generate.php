@@ -31,8 +31,8 @@ class Generate
      */
     public function execute(bool $force = false): void
     {
-        if ($force || !$this->configProvider->getToken()) {
-            $this->configProvider->setToken(
+        if ($force || !$this->configProvider->getApiKey()) {
+            $this->configProvider->setApiKey(
                 $this->getRandomString()
             );
         }

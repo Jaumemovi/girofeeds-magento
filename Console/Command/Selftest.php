@@ -64,8 +64,8 @@ class Selftest extends Command
             $hasErrors = true;
         }
 
-        $token = $this->configProvider->getToken();
-        if (!empty($token)) {
+        $apiKey = $this->configProvider->getApiKey();
+        if (!empty($apiKey)) {
             $output->writeln('<info>[PASS]</info> API key is set');
         } else {
             $output->writeln('<error>[FAIL]</error> API key is not set. Run girofeeds:token:generate');

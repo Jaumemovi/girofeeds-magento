@@ -54,8 +54,9 @@ class Feed extends AbstractHelper
     public function getJsonUrl($storeId)
     {
         $url = $this->storeManager->getStore($storeId)->getBaseUrl();
-        $token = $this->generalHelper->getToken();
-        return $url . sprintf('girofeeds/feed/json/id/%s/token/%s', $storeId, $token);
+        $storeCode = $this->storeManager->getStore($storeId)->getCode();
+        $apiKey = $this->generalHelper->getApiKey();
+        return $url . sprintf('girofeeds/feed/json?store=%s&key=%s', $storeCode, $apiKey);
     }
 
     public function getLastFetched($storeId)
