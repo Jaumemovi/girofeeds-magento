@@ -17,9 +17,20 @@ class Selftest extends Command
 
     private const COMMAND_NAME = 'girofeeds:selftest';
 
-    private ConfigProvider $configProvider;
-    private StoreManagerInterface $storeManager;
-    private Generate $generateModel;
+    /**
+     * @var ConfigProvider
+     */
+    private $configProvider;
+
+    /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * @var Generate
+     */
+    private $generateModel;
 
     public function __construct(
         ConfigProvider $configProvider,
