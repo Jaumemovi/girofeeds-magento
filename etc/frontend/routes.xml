@@ -8,8 +8,8 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:App/etc/routes.xsd">
     <router id="standard">
-        <route id="channable" frontName="channable">
-            <module name="Magmodules_Channable"/>
+        <route id="girofeeds" frontName="girofeeds">
+            <module name="Girofeeds_ProductApi"/>
         </route>
     </router>
-</config>
+</config> 
