@@ -4,14 +4,14 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Model\System\Config\Source\Configurable;
+namespace Girofeeds\ProductApi\Model\System\Config\Source\Configurable;
 
 use Magento\Framework\Option\ArrayInterface;
 
 /**
  * Class Image
  *
- * @package Magmodules\Channable\Model\System\Config\Source\Configurable
+ * @package Girofeeds\ProductApi\Model\System\Config\Source\Configurable
  */
 class Image implements ArrayInterface
 {

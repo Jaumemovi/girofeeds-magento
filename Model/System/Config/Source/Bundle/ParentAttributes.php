@@ -4,10 +4,10 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Model\System\Config\Source\Bundle;
+namespace Girofeeds\ProductApi\Model\System\Config\Source\Bundle;
 
 use Magento\Framework\Option\ArrayInterface;
-use Magmodules\Channable\Helper\Source as SourceHelper;
+use Girofeeds\ProductApi\Helper\Source as SourceHelper;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\App\Area;
 use Magento\Store\Model\App\Emulation;
@@ -15,7 +15,7 @@ use Magento\Store\Model\App\Emulation;
 /**
  * Class ParentAttributes
  *
- * @package Magmodules\Channable\Model\System\Config\Source\Bundle
+ * @package Girofeeds\ProductApi\Model\System\Config\Source\Bundle
  */
 class ParentAttributes implements ArrayInterface
 {

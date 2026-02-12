@@ -5,7 +5,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Model\Config\System;
+namespace Girofeeds\ProductApi\Model\Config\System;
 
 use Magento\Config\Model\ResourceModel\Config as ResourceConfig;
 use Magento\Config\Model\ResourceModel\Config\Data\CollectionFactory as ConfigDataCollectionFactory;

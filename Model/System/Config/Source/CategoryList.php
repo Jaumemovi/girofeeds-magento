@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Model\System\Config\Source;
+namespace Girofeeds\ProductApi\Model\System\Config\Source;
 
 use Magento\Framework\Option\ArrayInterface;
 use Magento\Catalog\Model\CategoryFactory;
@@ -13,7 +13,7 @@ use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory;
 /**
  * Class CategoryList
  *
- * @package Magmodules\Channable\Model\System\Config\Source
+ * @package Girofeeds\ProductApi\Model\System\Config\Source
  */
 class CategoryList implements ArrayInterface
 {

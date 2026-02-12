@@ -6,11 +6,11 @@
 
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer;
+namespace Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field\Renderer;
 
 use Magento\Framework\View\Element\Context;
 use Magento\Framework\View\Element\Html\Select;
-use Magmodules\Channable\Model\System\Config\Source\Attributes as AttributesSource;
+use Girofeeds\ProductApi\Model\System\Config\Source\Attributes as AttributesSource;
 
 /**
  * Class Attributes

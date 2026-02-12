@@ -6,7 +6,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Api\Config\System;
+namespace Girofeeds\ProductApi\Api\Config\System;
 
 interface FeedInterface
 {

@@ -4,16 +4,16 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer;
+namespace Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field\Renderer;
 
 use Magento\Framework\View\Element\Html\Select;
 use Magento\Framework\View\Element\Context;
-use Magmodules\Channable\Model\System\Config\Source\ProductTypes as ProductTypesSource;
+use Girofeeds\ProductApi\Model\System\Config\Source\ProductTypes as ProductTypesSource;
 
 /**
  * Class ProductTypes
  *
- * @package Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer
+ * @package Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field\Renderer
  */
 class ProductTypes extends Select
 {

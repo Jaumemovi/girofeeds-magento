@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer;
+namespace Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field\Renderer;
 
 use Magento\Framework\View\Element\Html\Select;
 use Magento\Framework\View\Element\Context;
@@ -13,7 +13,7 @@ use Magento\Directory\Model\Config\Source\Country as CountrySource;
 /**
  * Class Countries
  *
- * @package Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer
+ * @package Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field\Renderer
  */
 class Countries extends Select
 {

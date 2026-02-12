@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Model\System\Config\Source;
+namespace Girofeeds\ProductApi\Model\System\Config\Source;
 
 use Magento\Framework\Option\ArrayInterface;
 use Magento\Catalog\Model\Product\Attribute\Repository;
@@ -13,7 +13,7 @@ use Magento\Framework\Api\SearchCriteriaBuilder;
 /**
  * Class MainImage
  *
- * @package Magmodules\Channable\Model\System\Config\Source
+ * @package Girofeeds\ProductApi\Model\System\Config\Source
  */
 class MainImage implements ArrayInterface
 {

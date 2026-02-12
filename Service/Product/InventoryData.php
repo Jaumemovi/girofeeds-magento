@@ -5,11 +5,11 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Service\Product;
+namespace Girofeeds\ProductApi\Service\Product;
 
 use Magento\Catalog\Model\Product;
 use Magento\Framework\App\ResourceConnection;
-use Magmodules\Channable\Api\Config\RepositoryInterface as ConfigProvider;
+use Girofeeds\ProductApi\Api\Config\RepositoryInterface as ConfigProvider;
 
 class InventoryData
 {

@@ -5,9 +5,9 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Model\Config\System;
+namespace Girofeeds\ProductApi\Model\Config\System;
 
-use Magmodules\Channable\Api\Config\System\FeedInterface;
+use Girofeeds\ProductApi\Api\Config\System\FeedInterface;
 
 /**
  * Feed provider class

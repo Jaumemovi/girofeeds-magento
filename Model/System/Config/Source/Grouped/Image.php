@@ -4,14 +4,14 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Model\System\Config\Source\Grouped;
+namespace Girofeeds\ProductApi\Model\System\Config\Source\Grouped;
 
 use Magento\Framework\Option\ArrayInterface;
 
 /**
  * Class Image
  *
- * @package Magmodules\Channable\Model\System\Config\Source\Grouped
+ * @package Girofeeds\ProductApi\Model\System\Config\Source\Grouped
  */
 class Image implements ArrayInterface
 {

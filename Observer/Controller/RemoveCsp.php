@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Observer\Controller;
+namespace Girofeeds\ProductApi\Observer\Controller;
 
 use Magento\Framework\App\Request\Http as RequestHttp;
 use Magento\Framework\App\Response\Http as ResponseHttp;
@@ -14,7 +14,7 @@ use Magento\Framework\Event\ObserverInterface;
 /**
  * Class RemoveCsp
  *
- * @package Magmodules\Channable\Observer\Controller
+ * @package Girofeeds\ProductApi\Observer\Controller
  */
 class RemoveCsp implements ObserverInterface
 {

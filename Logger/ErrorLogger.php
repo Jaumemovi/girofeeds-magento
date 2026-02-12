@@ -5,7 +5,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Logger;
+namespace Girofeeds\ProductApi\Logger;
 
 use Magento\Framework\Serialize\Serializer\Json;
 use Monolog\Logger;

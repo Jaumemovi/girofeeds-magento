@@ -4,14 +4,14 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Model\System\Config\Source\Bundle;
+namespace Girofeeds\ProductApi\Model\System\Config\Source\Bundle;
 
 use Magento\Framework\Option\ArrayInterface;
 
 /**
  * Class Link
  *
- * @package Magmodules\Channable\Model\System\Config\Source\Bundle
+ * @package Girofeeds\ProductApi\Model\System\Config\Source\Bundle
  */
 class Link implements ArrayInterface
 {

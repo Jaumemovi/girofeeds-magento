@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Model\Collection;
+namespace Girofeeds\ProductApi\Model\Collection;
 
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
@@ -13,13 +13,13 @@ use Magento\Eav\Model\Config as EavConfig;
 use Magento\Catalog\Model\Indexer\Product\Flat\StateFactory;
 use Magento\Framework\App\ResourceConnection;
 use Magento\CatalogInventory\Helper\Stock as StockHelper;
-use Magmodules\Channable\Helper\Product as ProductHelper;
-use Magmodules\Channable\Helper\General as GeneralHelper;
+use Girofeeds\ProductApi\Helper\Product as ProductHelper;
+use Girofeeds\ProductApi\Helper\General as GeneralHelper;
 
 /**
  * Class Products
  *
- * @package Magmodules\Channable\Model\Collection
+ * @package Girofeeds\ProductApi\Model\Collection
  */
 class Products
 {

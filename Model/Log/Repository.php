@@ -5,15 +5,15 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Model\Log;
+namespace Girofeeds\ProductApi\Model\Log;
 
 use Magento\Framework\Filesystem\DirectoryList;
 use Magento\Framework\Filesystem\Driver\File;
 use Magento\Framework\Stdlib\DateTime\DateTime;
-use Magmodules\Channable\Api\Log\RepositoryInterface as LogRepository;
-use Magmodules\Channable\Api\Log\RepositoryInterface as LogRepositoryInterface;
-use Magmodules\Channable\Logger\DebugLogger;
-use Magmodules\Channable\Logger\ErrorLogger;
+use Girofeeds\ProductApi\Api\Log\RepositoryInterface as LogRepository;
+use Girofeeds\ProductApi\Api\Log\RepositoryInterface as LogRepositoryInterface;
+use Girofeeds\ProductApi\Logger\DebugLogger;
+use Girofeeds\ProductApi\Logger\ErrorLogger;
 
 /**
  * Logs repository class

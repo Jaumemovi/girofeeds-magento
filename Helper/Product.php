@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Helper;
+namespace Girofeeds\ProductApi\Helper;
 
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\App\Helper\Context;
@@ -18,10 +18,10 @@ use Magento\Framework\Filter\FilterManager;
 use Magento\ConfigurableProduct\Model\ResourceModel\Product\Type\Configurable as ConfigurableResource;
 use Magento\GroupedProduct\Model\ResourceModel\Product\Link as GroupedResource;
 use Magento\Bundle\Model\ResourceModel\Selection as BundleResource;
-use Magmodules\Channable\Api\Log\RepositoryInterface as LogRepository;
-use Magmodules\Channable\Service\Product\InventoryData;
-use Magmodules\Channable\Service\Product\MediaData;
-use Magmodules\Channable\Service\Product\PriceData;
+use Girofeeds\ProductApi\Api\Log\RepositoryInterface as LogRepository;
+use Girofeeds\ProductApi\Service\Product\InventoryData;
+use Girofeeds\ProductApi\Service\Product\MediaData;
+use Girofeeds\ProductApi\Service\Product\PriceData;
 use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 
 /**

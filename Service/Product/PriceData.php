@@ -5,7 +5,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Service\Product;
+namespace Girofeeds\ProductApi\Service\Product;
 
 use Magento\Bundle\Model\Product\Price;
 use Magento\Catalog\Helper\Data as CatalogHelper;

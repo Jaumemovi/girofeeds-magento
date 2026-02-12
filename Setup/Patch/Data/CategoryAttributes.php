@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Setup\Patch\Data;
+namespace Girofeeds\ProductApi\Setup\Patch\Data;
 
 use Magento\Catalog\Model\Category;
 use Magento\Eav\Model\Entity\Attribute\Source\Boolean;

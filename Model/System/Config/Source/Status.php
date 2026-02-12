@@ -5,7 +5,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Model\System\Config\Source;
+namespace Girofeeds\ProductApi\Model\System\Config\Source;
 
 use Magento\Framework\Data\OptionSourceInterface;
 

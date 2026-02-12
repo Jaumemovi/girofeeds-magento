@@ -5,7 +5,7 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Block\Adminhtml\Design;
+namespace Girofeeds\ProductApi\Block\Adminhtml\Design;
 
 use Magento\Config\Block\System\Config\Form\Field;
 use Magento\Framework\Data\Form\Element\AbstractElement;
@@ -13,7 +13,7 @@ use Magento\Framework\Data\Form\Element\AbstractElement;
 /**
  * Class Heading
  *
- * @package Magmodules\Channable\Block\Adminhtml\Design
+ * @package Girofeeds\ProductApi\Block\Adminhtml\Design
  */
 class Heading extends Field
 {

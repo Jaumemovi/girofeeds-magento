@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field;
+namespace Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field;
 
 use Magento\Framework\DataObject;
 use Magento\Config\Block\System\Config\Form\Field\FieldArray\AbstractFieldArray;
@@ -12,21 +12,21 @@ use Magento\Config\Block\System\Config\Form\Field\FieldArray\AbstractFieldArray;
 /**
  * Class Filters
  *
- * @package Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field
+ * @package Girofeeds\ProductApi\Block\Adminhtml\System\Config\Form\Field
  */
 class Filters extends AbstractFieldArray
 {
 
     /**
-     * @var \Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer\Attributes
+     * @var \Girofeeds\ProductApi$1
      */
     private $attributeRenderer;
     /**
-     * @var \Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer\Conditions
+     * @var \Girofeeds\ProductApi$1
      */
     private $conditionRenderer;
     /**
-     * @var \Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer\ProductTypes
+     * @var \Girofeeds\ProductApi$1
      */
     private $productTypeRenderer;
 
@@ -64,7 +64,7 @@ class Filters extends AbstractFieldArray
         if (!$this->attributeRenderer) {
             try {
                 $this->attributeRenderer = $this->getLayout()->createBlock(
-                    '\Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer\Attributes',
+                    '\Girofeeds\ProductApi$1',
                     '',
                     ['data' => ['is_render_to_js_template' => true]]
                 );
@@ -86,7 +86,7 @@ class Filters extends AbstractFieldArray
         if (!$this->conditionRenderer) {
             try {
                 $this->conditionRenderer = $this->getLayout()->createBlock(
-                    '\Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer\Conditions',
+                    '\Girofeeds\ProductApi$1',
                     '',
                     ['data' => ['is_render_to_js_template' => true]]
                 );
@@ -108,7 +108,7 @@ class Filters extends AbstractFieldArray
         if (!$this->productTypeRenderer) {
             try {
                 $this->productTypeRenderer = $this->getLayout()->createBlock(
-                    '\Magmodules\Channable\Block\Adminhtml\System\Config\Form\Field\Renderer\ProductTypes',
+                    '\Girofeeds\ProductApi$1',
                     '',
                     ['data' => ['is_render_to_js_template' => true]]
                 );

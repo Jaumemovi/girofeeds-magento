@@ -4,14 +4,14 @@
  * See COPYING.txt for license details.
  */
 
-namespace Magmodules\Channable\Model\Config\Backend\Serialized;
+namespace Girofeeds\ProductApi\Model\Config\Backend\Serialized;
 
 use Magento\Config\Model\Config\Backend\Serialized\ArraySerialized;
 
 /**
  * Class ExtraFields
  *
- * @package Magmodules\Channable\Model\Config\Backend\Serialized
+ * @package Girofeeds\ProductApi\Model\Config\Backend\Serialized
  */
 class ExtraFields extends ArraySerialized
 {
