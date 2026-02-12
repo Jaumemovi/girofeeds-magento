@@ -14,14 +14,40 @@ use Girofeeds\ProductApi\Api\Config\RepositoryInterface as ConfigProvider;
 class InventoryData
 {
 
-    private ResourceConnection $resourceConnection;
-    private ConfigProvider $configProvider;
+    /**
+     * @var ResourceConnection
+     */
+    private $resourceConnection;
 
-    private array $inventory = [];
-    private array $inventorySourceItems = [];
-    private array $reservation = [];
-    private array $bundleParentSimpleRelation = [];
-    private array $legacyInventory = [];
+    /**
+     * @var ConfigProvider
+     */
+    private $configProvider;
+
+    /**
+     * @var array
+     */
+    private $inventory = [];
+
+    /**
+     * @var array
+     */
+    private $inventorySourceItems = [];
+
+    /**
+     * @var array
+     */
+    private $reservation = [];
+
+    /**
+     * @var array
+     */
+    private $bundleParentSimpleRelation = [];
+
+    /**
+     * @var array
+     */
+    private $legacyInventory = [];
 
     public function __construct(
         ResourceConnection $resourceConnection,
