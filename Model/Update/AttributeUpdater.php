@@ -59,7 +59,9 @@ class AttributeUpdater
         }
 
         if ($optionId === null) {
-            $availableLabels = array_map(fn($o) => $o['label'], $options);
+            $availableLabels = array_map(function ($o) {
+                return $o['label'];
+            }, $options);
             return "Value '{$textValue}' is not a valid option for attribute '{$attributeCode}'. "
                 . "Available options: " . implode(', ', $availableLabels);
         }
