@@ -5,13 +5,13 @@
  */
 declare(strict_types=1);
 
-namespace Magmodules\Channable\Controller\Adminhtml\Log;
+namespace Girofeeds\ProductApi\Controller\Adminhtml\Log;
 
 use Magento\Backend\App\Action;
-use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\RequestInterface; 
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magmodules\Channable\Api\Log\RepositoryInterface as LogRepository;
+use Girofeeds\ProductApi\Api\Log\RepositoryInterface as LogRepository;
 
 /**
  * AJAX controller to check logs
@@ -23,7 +23,7 @@ class Stream extends Action
      *
      * @see _isAllowed()
      */
-    public const ADMIN_RESOURCE = 'Magmodules_Channable::configuration';
+    public const ADMIN_RESOURCE = 'Girofeeds_ProductApi::configuration';
 
     /**
      * @var JsonFactory
