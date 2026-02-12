@@ -19,4 +19,10 @@
             <resource ref="anonymous"/>
         </resources>
     </route>
+    <route url="/V1/girofeeds/feed" method="GET">
+        <service class="Girofeeds\ProductApi\Api\FeedInterface" method="getFeed"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
 </routes>
