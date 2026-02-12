@@ -13,13 +13,28 @@ class ApiKeyValidator
     private const XML_PATH_ENABLE = 'girofeeds_productapi/general/enable';
     private const XML_PATH_API_KEY = 'girofeeds_productapi/general/token';
 
-    private ScopeConfigInterface $scopeConfig;
+    /**
+     * @var ScopeConfigInterface
+     */
+    private $scopeConfig;
 
+    /**
+     * Constructor
+     *
+     * @param ScopeConfigInterface $scopeConfig
+     */
     public function __construct(ScopeConfigInterface $scopeConfig)
     {
         $this->scopeConfig = $scopeConfig;
     }
 
+    /**
+     * Validate API key
+     *
+     * @param string|null $key
+     * @param int|null $storeId
+     * @return array
+     */
     public function validate(?string $key, ?int $storeId = null): array
     {
         if (!$this->isModuleEnabled($storeId)) {
@@ -51,6 +66,12 @@ class ApiKeyValidator
         return ['valid' => true, 'code' => 200, 'message' => ''];
     }
 
+    /**
+     * Check if module is enabled
+     *
+     * @param int|null $storeId
+     * @return bool
+     */
     private function isModuleEnabled(?int $storeId = null): bool
     {
         return $this->scopeConfig->isSetFlag(
@@ -60,6 +81,12 @@ class ApiKeyValidator
         );
     }
 
+    /**
+     * Get stored API key
+     *
+     * @param int|null $storeId
+     * @return string|null
+     */
     private function getStoredApiKey(?int $storeId = null): ?string
     {
         $value = $this->scopeConfig->getValue(

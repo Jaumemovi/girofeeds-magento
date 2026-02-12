@@ -15,9 +15,22 @@ class ProductSaveAfter implements ObserverInterface
 
     private const XML_PATH_DEBUG = 'girofeeds_productapi/general/debug';
 
-    private DebugLogger $debugLogger;
-    private ScopeConfigInterface $scopeConfig;
+    /**
+     * @var DebugLogger
+     */
+    private $debugLogger;
 
+    /**
+     * @var ScopeConfigInterface
+     */
+    private $scopeConfig;
+
+    /**
+     * Constructor
+     *
+     * @param DebugLogger $debugLogger
+     * @param ScopeConfigInterface $scopeConfig
+     */
     public function __construct(
         DebugLogger $debugLogger,
         ScopeConfigInterface $scopeConfig
@@ -26,6 +39,12 @@ class ProductSaveAfter implements ObserverInterface
         $this->scopeConfig = $scopeConfig;
     }
 
+    /**
+     * Execute observer
+     *
+     * @param Observer $observer
+     * @return void
+     */
     public function execute(Observer $observer): void
     {
         if (!$this->isDebugEnabled()) {
@@ -45,6 +64,11 @@ class ProductSaveAfter implements ObserverInterface
         }
     }
 
+    /**
+     * Check if debug mode is enabled
+     *
+     * @return bool
+     */
     private function isDebugEnabled(): bool
     {
         return $this->scopeConfig->isSetFlag(

@@ -12,13 +12,40 @@ use Magento\Framework\Exception\NoSuchEntityException;
 
 class Count implements CountInterface
 {
+    /**
+     * @var Generate
+     */
+    private $generateModel;
 
-    private Generate $generateModel;
-    private RequestInterface $request;
-    private StoreManagerInterface $storeManager;
-    private ApiKeyValidator $apiKeyValidator;
-    private RateLimiter $rateLimiter;
+    /**
+     * @var RequestInterface
+     */
+    private $request;
 
+    /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * @var ApiKeyValidator
+     */
+    private $apiKeyValidator;
+
+    /**
+     * @var RateLimiter
+     */
+    private $rateLimiter;
+
+    /**
+     * Constructor
+     *
+     * @param Generate $generateModel
+     * @param RequestInterface $request
+     * @param StoreManagerInterface $storeManager
+     * @param ApiKeyValidator $apiKeyValidator
+     * @param RateLimiter $rateLimiter
+     */
     public function __construct(
         Generate $generateModel,
         RequestInterface $request,
@@ -33,7 +60,12 @@ class Count implements CountInterface
         $this->rateLimiter = $rateLimiter;
     }
 
-    public function getCount(): string
+    /**
+     * Get product count
+     *
+     * @return string
+     */
+    public function getCount()
     {
         $token = $this->request->getParam('key');
         $storeId = $this->resolveStoreId();
@@ -64,7 +96,12 @@ class Count implements CountInterface
         }
     }
 
-    private function resolveStoreId(): int
+    /**
+     * Resolve store ID from request
+     *
+     * @return int
+     */
+    private function resolveStoreId()
     {
         $storeCode = $this->request->getParam('store');
 

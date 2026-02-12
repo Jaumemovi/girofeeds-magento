@@ -9,19 +9,34 @@ use Magento\Eav\Model\Config as EavConfig;
 
 class AttributeUpdater
 {
+    /**
+     * @var EavConfig
+     */
+    private $eavConfig;
 
-    private EavConfig $eavConfig;
-
+    /**
+     * Constructor
+     *
+     * @param EavConfig $eavConfig
+     */
     public function __construct(EavConfig $eavConfig)
     {
         $this->eavConfig = $eavConfig;
     }
 
+    /**
+     * Update select attribute
+     *
+     * @param ProductInterface $product
+     * @param string $attributeCode
+     * @param string $textValue
+     * @return string|null
+     */
     public function updateSelectAttribute(
         ProductInterface $product,
-        string $attributeCode,
-        string $textValue
-    ): ?string {
+        $attributeCode,
+        $textValue
+    ) {
         $attribute = $this->eavConfig->getAttribute('catalog_product', $attributeCode);
 
         if (!$attribute || !$attribute->getId()) {

@@ -21,22 +21,94 @@ use Magento\Store\Model\StoreManagerInterface;
 
 class UpdateProduct implements UpdateProductInterface
 {
+    /**
+     * @var RequestInterface
+     */
+    private $request;
 
-    private RequestInterface $request;
-    private ProductRepositoryInterface $productRepository;
-    private StoreManagerInterface $storeManager;
-    private GeneralHelper $generalHelper;
-    private SourceHelper $sourceHelper;
-    private FieldProcessor $fieldProcessor;
-    private ValidationService $validationService;
-    private AttributeUpdater $attributeUpdater;
-    private PriceUpdater $priceUpdater;
-    private StockUpdater $stockUpdater;
-    private ImageUpdater $imageUpdater;
-    private CategoryUpdater $categoryUpdater;
-    private ApiKeyValidator $apiKeyValidator;
-    private RateLimiter $rateLimiter;
+    /**
+     * @var ProductRepositoryInterface
+     */
+    private $productRepository;
 
+    /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * @var GeneralHelper
+     */
+    private $generalHelper;
+
+    /**
+     * @var SourceHelper
+     */
+    private $sourceHelper;
+
+    /**
+     * @var FieldProcessor
+     */
+    private $fieldProcessor;
+
+    /**
+     * @var ValidationService
+     */
+    private $validationService;
+
+    /**
+     * @var AttributeUpdater
+     */
+    private $attributeUpdater;
+
+    /**
+     * @var PriceUpdater
+     */
+    private $priceUpdater;
+
+    /**
+     * @var StockUpdater
+     */
+    private $stockUpdater;
+
+    /**
+     * @var ImageUpdater
+     */
+    private $imageUpdater;
+
+    /**
+     * @var CategoryUpdater
+     */
+    private $categoryUpdater;
+
+    /**
+     * @var ApiKeyValidator
+     */
+    private $apiKeyValidator;
+
+    /**
+     * @var RateLimiter
+     */
+    private $rateLimiter;
+
+    /**
+     * Constructor
+     *
+     * @param RequestInterface $request
+     * @param ProductRepositoryInterface $productRepository
+     * @param StoreManagerInterface $storeManager
+     * @param GeneralHelper $generalHelper
+     * @param SourceHelper $sourceHelper
+     * @param FieldProcessor $fieldProcessor
+     * @param ValidationService $validationService
+     * @param AttributeUpdater $attributeUpdater
+     * @param PriceUpdater $priceUpdater
+     * @param StockUpdater $stockUpdater
+     * @param ImageUpdater $imageUpdater
+     * @param CategoryUpdater $categoryUpdater
+     * @param ApiKeyValidator $apiKeyValidator
+     * @param RateLimiter $rateLimiter
+     */
     public function __construct(
         RequestInterface $request,
         ProductRepositoryInterface $productRepository,
@@ -69,7 +141,12 @@ class UpdateProduct implements UpdateProductInterface
         $this->rateLimiter = $rateLimiter;
     }
 
-    public function execute(): string
+    /**
+     * Execute product update
+     *
+     * @return string
+     */
+    public function execute()
     {
         $token = $this->request->getParam('key');
 
@@ -219,7 +296,15 @@ class UpdateProduct implements UpdateProductInterface
         }
     }
 
-    private function processTextAttributes($product, array $resolved, array &$updatedFields): void
+    /**
+     * Process text attributes
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param array $resolved
+     * @param array $updatedFields
+     * @return void
+     */
+    private function processTextAttributes($product, array $resolved, array &$updatedFields)
     {
         $textFields = [
             'name', 'description', 'short_description',
@@ -236,7 +321,15 @@ class UpdateProduct implements UpdateProductInterface
         }
     }
 
-    private function processNumericAttributes($product, array $resolved, array &$updatedFields): void
+    /**
+     * Process numeric attributes
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param array $resolved
+     * @param array $updatedFields
+     * @return void
+     */
+    private function processNumericAttributes($product, array $resolved, array &$updatedFields)
     {
         $numericFields = ['weight', 'length', 'width', 'height'];
 
@@ -248,13 +341,23 @@ class UpdateProduct implements UpdateProductInterface
         }
     }
 
+    /**
+     * Process select attributes
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param array $resolved
+     * @param array $updatedFields
+     * @param array $warnings
+     * @param array $failedFields
+     * @return void
+     */
     private function processSelectAttributes(
         $product,
         array $resolved,
         array &$updatedFields,
         array &$warnings,
         array &$failedFields
-    ): void {
+    ) {
         $selectFields = [
             'color'    => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_COLOR_SOURCE),
             'size'     => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_SIZE_SOURCE),
@@ -280,7 +383,15 @@ class UpdateProduct implements UpdateProductInterface
         }
     }
 
-    private function processIdentifierFields($product, array $resolved, array &$updatedFields): void
+    /**
+     * Process identifier fields
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param array $resolved
+     * @param array $updatedFields
+     * @return void
+     */
+    private function processIdentifierFields($product, array $resolved, array &$updatedFields)
     {
         if (array_key_exists('sku', $resolved)) {
             $product->setSku($resolved['sku']);
@@ -296,7 +407,15 @@ class UpdateProduct implements UpdateProductInterface
         }
     }
 
-    private function processStatusAndVisibility($product, array $resolved, array &$updatedFields): void
+    /**
+     * Process status and visibility fields
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param array $resolved
+     * @param array $updatedFields
+     * @return void
+     */
+    private function processStatusAndVisibility($product, array $resolved, array &$updatedFields)
     {
         if (array_key_exists('status', $resolved)) {
             $status = $resolved['status'];
@@ -313,7 +432,15 @@ class UpdateProduct implements UpdateProductInterface
         }
     }
 
-    private function processCustomMappedAttributes($product, array $resolved, array &$updatedFields): void
+    /**
+     * Process custom mapped attributes
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param array $resolved
+     * @param array $updatedFields
+     * @return void
+     */
+    private function processCustomMappedAttributes($product, array $resolved, array &$updatedFields)
     {
         $extraFields = $this->sourceHelper->getExtraFields();
         if (empty($extraFields)) {
@@ -336,15 +463,27 @@ class UpdateProduct implements UpdateProductInterface
         }
     }
 
+    /**
+     * Build response array
+     *
+     * @param string $status
+     * @param string $message
+     * @param array $updatedFields
+     * @param array $warnings
+     * @param array $failedFields
+     * @param int|null $productId
+     * @param array $errors
+     * @return string
+     */
     private function buildResponse(
-        string $status,
-        string $message,
+        $status,
+        $message,
         array $updatedFields = [],
         array $warnings = [],
         array $failedFields = [],
-        ?int $productId = null,
+        $productId = null,
         array $errors = []
-    ): string {
+    ) {
         $response = [
             'status' => $status,
             'message' => $message,

@@ -9,15 +9,27 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 
 class RateLimiter
 {
-
     private const CACHE_PREFIX = 'girofeeds_rate_';
     private const TTL_SECONDS = 60;
     private const XML_PATH_RATE_LIMIT = 'girofeeds_productapi/general/rate_limit';
     private const DEFAULT_MAX_REQUESTS = 60;
 
-    private CacheInterface $cache;
-    private ScopeConfigInterface $scopeConfig;
+    /**
+     * @var CacheInterface
+     */
+    private $cache;
 
+    /**
+     * @var ScopeConfigInterface
+     */
+    private $scopeConfig;
+
+    /**
+     * Constructor
+     *
+     * @param CacheInterface $cache
+     * @param ScopeConfigInterface $scopeConfig
+     */
     public function __construct(
         CacheInterface $cache,
         ScopeConfigInterface $scopeConfig
@@ -26,7 +38,13 @@ class RateLimiter
         $this->scopeConfig = $scopeConfig;
     }
 
-    public function isAllowed(string $apiKey): bool
+    /**
+     * Check if API key is allowed based on rate limiting
+     *
+     * @param string $apiKey
+     * @return bool
+     */
+    public function isAllowed($apiKey)
     {
         $cacheKey = $this->getCacheKey($apiKey);
         $current = (int) $this->cache->load($cacheKey);
@@ -40,13 +58,24 @@ class RateLimiter
         return true;
     }
 
-    public function getMaxRequests(): int
+    /**
+     * Get maximum number of requests allowed
+     *
+     * @return int
+     */
+    public function getMaxRequests()
     {
         $configured = (int) $this->scopeConfig->getValue(self::XML_PATH_RATE_LIMIT);
         return $configured > 0 ? $configured : self::DEFAULT_MAX_REQUESTS;
     }
 
-    private function getCacheKey(string $apiKey): string
+    /**
+     * Get cache key for API key
+     *
+     * @param string $apiKey
+     * @return string
+     */
+    private function getCacheKey($apiKey)
     {
         return self::CACHE_PREFIX . substr(hash('sha256', $apiKey), 0, 8);
     }

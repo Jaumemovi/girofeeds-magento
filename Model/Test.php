@@ -13,16 +13,58 @@ use Magento\Store\Model\StoreManagerInterface;
 
 class Test implements TestInterface
 {
+    /**
+     * @var GeneralHelper
+     */
+    private $generalHelper;
 
-    private GeneralHelper $generalHelper;
-    private SourceHelper $sourceHelper;
-    private ProductMetadataInterface $productMetadata;
-    private StoreManagerInterface $storeManager;
-    private Generate $generateModel;
-    private RequestInterface $request;
-    private ApiKeyValidator $apiKeyValidator;
-    private RateLimiter $rateLimiter;
+    /**
+     * @var SourceHelper
+     */
+    private $sourceHelper;
 
+    /**
+     * @var ProductMetadataInterface
+     */
+    private $productMetadata;
+
+    /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * @var Generate
+     */
+    private $generateModel;
+
+    /**
+     * @var RequestInterface
+     */
+    private $request;
+
+    /**
+     * @var ApiKeyValidator
+     */
+    private $apiKeyValidator;
+
+    /**
+     * @var RateLimiter
+     */
+    private $rateLimiter;
+
+    /**
+     * Constructor
+     *
+     * @param GeneralHelper $generalHelper
+     * @param SourceHelper $sourceHelper
+     * @param ProductMetadataInterface $productMetadata
+     * @param StoreManagerInterface $storeManager
+     * @param Generate $generateModel
+     * @param RequestInterface $request
+     * @param ApiKeyValidator $apiKeyValidator
+     * @param RateLimiter $rateLimiter
+     */
     public function __construct(
         GeneralHelper $generalHelper,
         SourceHelper $sourceHelper,
@@ -43,7 +85,12 @@ class Test implements TestInterface
         $this->rateLimiter = $rateLimiter;
     }
 
-    public function test(): string
+    /**
+     * Execute test endpoint logic
+     *
+     * @return string
+     */
+    public function test()
     {
         $token = $this->request->getParam('key');
 
@@ -95,7 +142,12 @@ class Test implements TestInterface
         }
     }
 
-    private function getSupportedFields(): array
+    /**
+     * Get list of supported fields
+     *
+     * @return array
+     */
+    private function getSupportedFields()
     {
         return [
             'name',

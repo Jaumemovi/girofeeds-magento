@@ -17,15 +17,53 @@ use Magento\Framework\App\Response\Http as HttpResponse;
 
 class Json extends Action
 {
+    /**
+     * @var GenerateModel
+     */
+    private $generateModel;
 
-    private GenerateModel $generateModel;
-    private FeedHelper $feedHelper;
-    private JsonFactory $resultJsonFactory;
-    private RemoteAddress $remoteAddress;
-    private ApiKeyValidator $apiKeyValidator;
-    private RateLimiter $rateLimiter;
-    private ApiLogger $apiLogger;
+    /**
+     * @var FeedHelper
+     */
+    private $feedHelper;
 
+    /**
+     * @var JsonFactory
+     */
+    private $resultJsonFactory;
+
+    /**
+     * @var RemoteAddress
+     */
+    private $remoteAddress;
+
+    /**
+     * @var ApiKeyValidator
+     */
+    private $apiKeyValidator;
+
+    /**
+     * @var RateLimiter
+     */
+    private $rateLimiter;
+
+    /**
+     * @var ApiLogger
+     */
+    private $apiLogger;
+
+    /**
+     * Constructor
+     *
+     * @param Context $context
+     * @param GenerateModel $generateModel
+     * @param FeedHelper $feedHelper
+     * @param JsonFactory $resultJsonFactory
+     * @param RemoteAddress $remoteAddress
+     * @param ApiKeyValidator $apiKeyValidator
+     * @param RateLimiter $rateLimiter
+     * @param ApiLogger $apiLogger
+     */
     public function __construct(
         Context $context,
         GenerateModel $generateModel,
@@ -46,6 +84,11 @@ class Json extends Action
         $this->apiLogger = $apiLogger;
     }
 
+    /**
+     * Execute feed generation
+     *
+     * @return \Magento\Framework\Controller\Result\Json
+     */
     public function execute()
     {
         $startTime = microtime(true);
@@ -99,7 +142,14 @@ class Json extends Action
         }
     }
 
-    private function buildErrorResponse(string $code, string $message): array
+    /**
+     * Build error response array
+     *
+     * @param string $code
+     * @param string $message
+     * @return array
+     */
+    private function buildErrorResponse($code, $message)
     {
         return [
             'success' => false,
@@ -110,7 +160,12 @@ class Json extends Action
         ];
     }
 
-    private function setNoCacheHeaders(): void
+    /**
+     * Set no-cache headers on the response
+     *
+     * @return void
+     */
+    private function setNoCacheHeaders()
     {
         /** @var HttpResponse $response */
         $response = $this->getResponse();
@@ -119,7 +174,13 @@ class Json extends Action
         $response->setHeader('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT', true);
     }
 
-    private function elapsed(float $startTime): float
+    /**
+     * Calculate elapsed time in milliseconds
+     *
+     * @param float $startTime
+     * @return float
+     */
+    private function elapsed($startTime)
     {
         return (microtime(true) - $startTime) * 1000;
     }

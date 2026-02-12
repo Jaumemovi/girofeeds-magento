@@ -17,13 +17,47 @@ use Magento\Framework\App\Response\Http as HttpResponse;
 class Index extends Action
 {
 
-    private CountInterface $countModel;
-    private JsonFactory $resultJsonFactory;
-    private RemoteAddress $remoteAddress;
-    private ApiKeyValidator $apiKeyValidator;
-    private RateLimiter $rateLimiter;
-    private ApiLogger $apiLogger;
+    /**
+     * @var CountInterface
+     */
+    private $countModel;
 
+    /**
+     * @var JsonFactory
+     */
+    private $resultJsonFactory;
+
+    /**
+     * @var RemoteAddress
+     */
+    private $remoteAddress;
+
+    /**
+     * @var ApiKeyValidator
+     */
+    private $apiKeyValidator;
+
+    /**
+     * @var RateLimiter
+     */
+    private $rateLimiter;
+
+    /**
+     * @var ApiLogger
+     */
+    private $apiLogger;
+
+    /**
+     * Constructor
+     *
+     * @param Context $context
+     * @param CountInterface $countModel
+     * @param JsonFactory $resultJsonFactory
+     * @param RemoteAddress $remoteAddress
+     * @param ApiKeyValidator $apiKeyValidator
+     * @param RateLimiter $rateLimiter
+     * @param ApiLogger $apiLogger
+     */
     public function __construct(
         Context $context,
         CountInterface $countModel,
@@ -42,6 +76,11 @@ class Index extends Action
         $this->apiLogger = $apiLogger;
     }
 
+    /**
+     * Execute action
+     *
+     * @return \Magento\Framework\Controller\Result\Json
+     */
     public function execute()
     {
         $startTime = microtime(true);
@@ -84,6 +123,11 @@ class Index extends Action
         }
     }
 
+    /**
+     * Set no-cache headers
+     *
+     * @return void
+     */
     private function setNoCacheHeaders(): void
     {
         /** @var HttpResponse $response */
@@ -93,6 +137,12 @@ class Index extends Action
         $response->setHeader('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT', true);
     }
 
+    /**
+     * Calculate elapsed time in milliseconds
+     *
+     * @param float $startTime
+     * @return float
+     */
     private function elapsed(float $startTime): float
     {
         return (microtime(true) - $startTime) * 1000;

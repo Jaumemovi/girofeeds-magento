@@ -9,15 +9,29 @@ use Magento\CatalogInventory\Api\StockRegistryInterface;
 
 class StockUpdater
 {
+    /**
+     * @var StockRegistryInterface
+     */
+    private $stockRegistry;
 
-    private StockRegistryInterface $stockRegistry;
-
+    /**
+     * Constructor
+     *
+     * @param StockRegistryInterface $stockRegistry
+     */
     public function __construct(StockRegistryInterface $stockRegistry)
     {
         $this->stockRegistry = $stockRegistry;
     }
 
-    public function updateStock(ProductInterface $product, array $resolvedData): array
+    /**
+     * Update product stock
+     *
+     * @param ProductInterface $product
+     * @param array $resolvedData
+     * @return array
+     */
+    public function updateStock(ProductInterface $product, array $resolvedData)
     {
         $warnings = [];
         $stockFields = ['qty', 'is_in_stock', 'manage_stock', 'min_sale_qty', 'max_sale_qty', 'backorders'];

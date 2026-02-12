@@ -12,7 +12,6 @@ use Magento\Framework\UrlInterface;
 
 class ImageUpdater
 {
-
     private const MAX_FILE_SIZE = 10485760;
     private const DOWNLOAD_TIMEOUT = 15;
     private const ALLOWED_MIME_TYPES = [
@@ -22,9 +21,22 @@ class ImageUpdater
         'image/gif'  => 'gif',
     ];
 
-    private Filesystem $filesystem;
-    private StoreManagerInterface $storeManager;
+    /**
+     * @var Filesystem
+     */
+    private $filesystem;
 
+    /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * Constructor
+     *
+     * @param Filesystem $filesystem
+     * @param StoreManagerInterface $storeManager
+     */
     public function __construct(
         Filesystem $filesystem,
         StoreManagerInterface $storeManager
@@ -33,7 +45,14 @@ class ImageUpdater
         $this->storeManager = $storeManager;
     }
 
-    public function updateImages(ProductInterface $product, array $resolvedData): array
+    /**
+     * Update product images
+     *
+     * @param ProductInterface $product
+     * @param array $resolvedData
+     * @return array
+     */
+    public function updateImages(ProductInterface $product, array $resolvedData)
     {
         $warnings = [];
 
@@ -57,7 +76,15 @@ class ImageUpdater
         return $warnings;
     }
 
-    private function processImage(ProductInterface $product, string $imageSource, bool $isMain): ?string
+    /**
+     * Process single image
+     *
+     * @param ProductInterface $product
+     * @param string $imageSource
+     * @param bool $isMain
+     * @return string|null
+     */
+    private function processImage(ProductInterface $product, $imageSource, $isMain)
     {
         try {
             $storeMediaUrl = $this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_MEDIA);
@@ -92,7 +119,13 @@ class ImageUpdater
         }
     }
 
-    private function decodeBase64Image(string $dataUrl): ?string
+    /**
+     * Decode base64 image
+     *
+     * @param string $dataUrl
+     * @return string|null
+     */
+    private function decodeBase64Image($dataUrl)
     {
         if (!preg_match('/^data:image\/(\w+);base64,(.+)$/', $dataUrl, $matches)) {
             return null;
@@ -118,7 +151,13 @@ class ImageUpdater
         return $tmpFile;
     }
 
-    private function downloadImage(string $url): ?string
+    /**
+     * Download image from URL
+     *
+     * @param string $url
+     * @return string|null
+     */
+    private function downloadImage($url)
     {
         try {
             $ch = curl_init($url);

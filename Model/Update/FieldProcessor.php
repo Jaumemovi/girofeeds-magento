@@ -6,8 +6,10 @@ namespace Girofeeds\ProductApi\Model\Update;
 
 class FieldProcessor
 {
-
-    private array $aliasMap = [
+    /**
+     * @var array
+     */
+    private $aliasMap = [
         'stock'          => 'qty',
         'reference'      => 'sku',
         'ean13'          => 'ean',
@@ -18,7 +20,10 @@ class FieldProcessor
         'manufacturer'   => 'brand',
     ];
 
-    private array $priorityRules = [
+    /**
+     * @var array
+     */
+    private $priorityRules = [
         'qty'           => ['qty', 'stock'],
         'sku'           => ['sku', 'reference'],
         'ean'           => ['ean', 'ean13', 'gtin'],
@@ -28,9 +33,18 @@ class FieldProcessor
         'image_link'    => ['image_link', 'image'],
     ];
 
-    private array $valueConversionFields = ['active', 'visible'];
+    /**
+     * @var array
+     */
+    private $valueConversionFields = ['active', 'visible'];
 
-    public function resolveFields(array $data): array
+    /**
+     * Resolve fields from data
+     *
+     * @param array $data
+     * @return array
+     */
+    public function resolveFields(array $data)
     {
         $resolved = [];
         $processedAliases = [];
@@ -86,7 +100,13 @@ class FieldProcessor
         return $resolved;
     }
 
-    private function convertActiveToStatus($value): int
+    /**
+     * Convert active value to status
+     *
+     * @param mixed $value
+     * @return int
+     */
+    private function convertActiveToStatus($value)
     {
         if ($value === true || $value === 1 || $value === '1' || $value === 'true') {
             return 1;
@@ -94,7 +114,13 @@ class FieldProcessor
         return 2;
     }
 
-    private function convertVisibleToVisibility($value): int
+    /**
+     * Convert visible value to visibility
+     *
+     * @param mixed $value
+     * @return int
+     */
+    private function convertVisibleToVisibility($value)
     {
         if ($value === true || $value === 1 || $value === '1' || $value === 'true') {
             return 4;
@@ -102,7 +128,13 @@ class FieldProcessor
         return 1;
     }
 
-    private function processSpecialPrice($value): ?float
+    /**
+     * Process special price value
+     *
+     * @param mixed $value
+     * @return float|null
+     */
+    private function processSpecialPrice($value)
     {
         if ($value === null || $value === '' || $value === 0 || $value === '0') {
             return null;

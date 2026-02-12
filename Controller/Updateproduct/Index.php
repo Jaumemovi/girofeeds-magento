@@ -16,14 +16,47 @@ use Magento\Framework\App\Response\Http as HttpResponse;
 
 class Index extends Action
 {
+    /**
+     * @var UpdateProductInterface
+     */
+    private $updateProduct;
 
-    private UpdateProductInterface $updateProduct;
-    private JsonFactory $resultJsonFactory;
-    private RemoteAddress $remoteAddress;
-    private ApiKeyValidator $apiKeyValidator;
-    private RateLimiter $rateLimiter;
-    private ApiLogger $apiLogger;
+    /**
+     * @var JsonFactory
+     */
+    private $resultJsonFactory;
 
+    /**
+     * @var RemoteAddress
+     */
+    private $remoteAddress;
+
+    /**
+     * @var ApiKeyValidator
+     */
+    private $apiKeyValidator;
+
+    /**
+     * @var RateLimiter
+     */
+    private $rateLimiter;
+
+    /**
+     * @var ApiLogger
+     */
+    private $apiLogger;
+
+    /**
+     * Constructor
+     *
+     * @param Context $context
+     * @param UpdateProductInterface $updateProduct
+     * @param JsonFactory $resultJsonFactory
+     * @param RemoteAddress $remoteAddress
+     * @param ApiKeyValidator $apiKeyValidator
+     * @param RateLimiter $rateLimiter
+     * @param ApiLogger $apiLogger
+     */
     public function __construct(
         Context $context,
         UpdateProductInterface $updateProduct,
@@ -42,6 +75,11 @@ class Index extends Action
         $this->apiLogger = $apiLogger;
     }
 
+    /**
+     * Execute update product endpoint
+     *
+     * @return \Magento\Framework\Controller\Result\Json
+     */
     public function execute()
     {
         $startTime = microtime(true);
@@ -91,7 +129,12 @@ class Index extends Action
         }
     }
 
-    private function setNoCacheHeaders(): void
+    /**
+     * Set no-cache headers on the response
+     *
+     * @return void
+     */
+    private function setNoCacheHeaders()
     {
         /** @var HttpResponse $response */
         $response = $this->getResponse();
@@ -100,7 +143,13 @@ class Index extends Action
         $response->setHeader('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT', true);
     }
 
-    private function elapsed(float $startTime): float
+    /**
+     * Calculate elapsed time in milliseconds
+     *
+     * @param float $startTime
+     * @return float
+     */
+    private function elapsed($startTime)
     {
         return (microtime(true) - $startTime) * 1000;
     }

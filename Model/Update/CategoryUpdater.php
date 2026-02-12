@@ -11,10 +11,22 @@ use Magento\Framework\Exception\NoSuchEntityException;
 
 class CategoryUpdater
 {
+    /**
+     * @var CategoryRepositoryInterface
+     */
+    private $categoryRepository;
 
-    private CategoryRepositoryInterface $categoryRepository;
-    private CategoryCollectionFactory $categoryCollectionFactory;
+    /**
+     * @var CategoryCollectionFactory
+     */
+    private $categoryCollectionFactory;
 
+    /**
+     * Constructor
+     *
+     * @param CategoryRepositoryInterface $categoryRepository
+     * @param CategoryCollectionFactory $categoryCollectionFactory
+     */
     public function __construct(
         CategoryRepositoryInterface $categoryRepository,
         CategoryCollectionFactory $categoryCollectionFactory
@@ -23,7 +35,14 @@ class CategoryUpdater
         $this->categoryCollectionFactory = $categoryCollectionFactory;
     }
 
-    public function updateCategories(ProductInterface $product, array $resolvedData): array
+    /**
+     * Update product categories
+     *
+     * @param ProductInterface $product
+     * @param array $resolvedData
+     * @return array
+     */
+    public function updateCategories(ProductInterface $product, array $resolvedData)
     {
         $warnings = [];
 
@@ -59,7 +78,13 @@ class CategoryUpdater
         return $warnings;
     }
 
-    private function findCategoryByPath(string $path): ?int
+    /**
+     * Find category by path
+     *
+     * @param string $path
+     * @return int|null
+     */
+    private function findCategoryByPath($path)
     {
         $parts = array_map('trim', explode(' > ', $path));
         $lastCategoryName = end($parts);
