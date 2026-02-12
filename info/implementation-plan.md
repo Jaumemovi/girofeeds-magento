@@ -12,7 +12,7 @@ The goal is to transform this codebase into `Girofeeds_ProductApi` — a focused
 4. **Connection Test** (GET endpoint returning module info and supported fields)
 
 Everything related to orders, returns, item update webhooks (push to Channable), custom payment method, custom carrier, and marketplace-specific admin grids must be removed.
-
+ 
 ---
 
 ## Step 1: Global Rename — Namespace, Module Name, and Config Paths
