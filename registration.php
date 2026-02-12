@@ -6,6 +6,7 @@
 
 \Magento\Framework\Component\ComponentRegistrar::register(
     \Magento\Framework\Component\ComponentRegistrar::MODULE,
-    'Magmodules_Channable',
+    'Girofeeds_ProductApi',
     __DIR__
 );
+ 
