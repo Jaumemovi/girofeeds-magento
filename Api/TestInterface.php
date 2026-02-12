@@ -6,5 +6,10 @@ namespace Girofeeds\ProductApi\Api;
 
 interface TestInterface
 {
+    /**
+     * Test API connection
+     *
+     * @return string
+     */
     public function test(): string;
 }

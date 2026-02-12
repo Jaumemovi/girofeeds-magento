@@ -6,5 +6,10 @@ namespace Girofeeds\ProductApi\Api;
 
 interface CountInterface
 {
+    /**
+     * Get product count
+     *
+     * @return string
+     */
     public function getCount(): string;
 }
