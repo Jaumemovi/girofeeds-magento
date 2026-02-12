@@ -8,6 +8,6 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
     <event name="controller_front_send_response_before">
-        <observer name="channable_controller_front_remove_csp" instance="Magmodules\Channable\Observer\Controller\RemoveCsp"/>
+        <observer name="girofeeds_controller_front_remove_csp" instance="Girofeeds\ProductApi\Observer\Controller\RemoveCsp"/>
     </event>
 </config>
