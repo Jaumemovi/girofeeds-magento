@@ -5,7 +5,7 @@ require([
 ], function ($, modal) {
     'use strict';
 
-    const moduleName = 'channable';
+    const moduleName = 'productapi';
 
     /**
      * @param{String} modalSelector - modal css selector.
