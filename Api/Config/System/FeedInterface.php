@@ -11,7 +11,7 @@ namespace Girofeeds\ProductApi\Api\Config\System;
 interface FeedInterface
 {
 
-    public const XML_PATH_BUNDLE_STOCK_CALCULATION = 'magmodules_channable/types/bundle_stock_calculation';
+    public const XML_PATH_BUNDLE_STOCK_CALCULATION = 'girofeeds_productapi/types/bundle_stock_calculation';
 
     /**
      * Check if bundle stock calculation is enabled.

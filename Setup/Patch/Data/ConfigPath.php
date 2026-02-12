@@ -70,13 +70,14 @@ class ConfigPath implements DataPatchInterface
      */
     public function changeConfigPaths()
     {
+        // Migrate from old magmodules_channable paths to new girofeeds_productapi paths
         $collection = $this->configReader->getCollection()
             ->addFieldToFilter("path", "magmodules_channable/advanced/parent_atts");
 
         foreach ($collection as $config) {
             /** @var Value $config */
             $this->configWriter->save(
-                "magmodules_channable/types/configurable_parent_atts",
+                "girofeeds_productapi/types/configurable_parent_atts",
                 $config->getValue(),
                 $config->getScope(),
                 $config->getScopeId()
@@ -95,7 +96,7 @@ class ConfigPath implements DataPatchInterface
             /** @var Value $config */
             if ($config->getValue() == 1) {
                 $this->configWriter->save(
-                    "magmodules_channable/types/configurable",
+                    "girofeeds_productapi/types/configurable",
                     'simple',
                     $config->getScope(),
                     $config->getScopeId()

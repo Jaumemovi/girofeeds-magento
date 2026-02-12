@@ -24,7 +24,7 @@ use Magento\Store\Model\StoreManagerInterface;
 class BaseRepository
 {
 
-    const XML_PATH_TOKEN = 'magmodules_channable/general/token';
+    const XML_PATH_TOKEN = 'girofeeds_productapi/general/token';
 
     /**
      * @var Json
