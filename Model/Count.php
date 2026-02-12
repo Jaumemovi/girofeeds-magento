@@ -65,7 +65,7 @@ class Count implements CountInterface
      *
      * @return string
      */
-    public function getCount()
+    public function getCount(): string
     {
         $token = $this->request->getParam('key');
         $storeId = $this->resolveStoreId();

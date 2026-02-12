@@ -90,7 +90,7 @@ class Test implements TestInterface
      *
      * @return string
      */
-    public function test()
+    public function test(): string
     {
         $token = $this->request->getParam('key');
 

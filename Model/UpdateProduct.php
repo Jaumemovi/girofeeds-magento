@@ -146,7 +146,7 @@ class UpdateProduct implements UpdateProductInterface
      *
      * @return string
      */
-    public function execute()
+    public function execute(): string
     {
         $token = $this->request->getParam('key');
 
