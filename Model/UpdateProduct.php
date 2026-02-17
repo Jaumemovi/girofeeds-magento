@@ -17,6 +17,7 @@ use Girofeeds\ProductApi\Model\Update\ValidationService;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\Webapi\Rest\Response as RestResponse;
 use Magento\Store\Model\StoreManagerInterface;
 
 class UpdateProduct implements UpdateProductInterface
@@ -90,6 +91,10 @@ class UpdateProduct implements UpdateProductInterface
      * @var RateLimiter
      */
     private $rateLimiter;
+    /**
+     * @var RestResponse
+     */
+    private $restResponse;
 
     /**
      * Constructor
@@ -108,6 +113,7 @@ class UpdateProduct implements UpdateProductInterface
      * @param CategoryUpdater $categoryUpdater
      * @param ApiKeyValidator $apiKeyValidator
      * @param RateLimiter $rateLimiter
+     * @param RestResponse $restResponse
      */
     public function __construct(
         RequestInterface $request,
@@ -123,7 +129,8 @@ class UpdateProduct implements UpdateProductInterface
         ImageUpdater $imageUpdater,
         CategoryUpdater $categoryUpdater,
         ApiKeyValidator $apiKeyValidator,
-        RateLimiter $rateLimiter
+        RateLimiter $rateLimiter,
+        RestResponse $restResponse
     ) {
         $this->request = $request;
         $this->productRepository = $productRepository;
@@ -139,6 +146,7 @@ class UpdateProduct implements UpdateProductInterface
         $this->categoryUpdater = $categoryUpdater;
         $this->apiKeyValidator = $apiKeyValidator;
         $this->rateLimiter = $rateLimiter;
+        $this->restResponse = $restResponse;
     }
 
     /**
@@ -152,11 +160,20 @@ class UpdateProduct implements UpdateProductInterface
 
         $validation = $this->apiKeyValidator->validate($token);
         if (!$validation['valid']) {
-            return $this->buildResponse('error', $validation['message'], [], [], [], null, [$validation['message']]);
+            return $this->buildResponse(
+                'error',
+                $validation['message'],
+                [],
+                [],
+                [],
+                null,
+                [$validation['message']],
+                (int)($validation['code'] ?? 401)
+            );
         }
 
         if ($token && !$this->rateLimiter->isAllowed($token)) {
-            return $this->buildResponse('error', 'Rate limit exceeded', [], [], [], null, ['Rate limit exceeded']);
+            return $this->buildResponse('error', 'Rate limit exceeded', [], [], [], null, ['Rate limit exceeded'], 429);
         }
 
         try {
@@ -164,7 +181,16 @@ class UpdateProduct implements UpdateProductInterface
             $data = json_decode($body, true);
 
             if (!is_array($data) || empty($data['id_product'])) {
-                return $this->buildResponse('error', 'Missing required field: id_product', [], [], [], null, ['id_product is required']);
+                return $this->buildResponse(
+                    'error',
+                    'Missing required field: id_product',
+                    [],
+                    [],
+                    [],
+                    null,
+                    ['id_product is required'],
+                    400
+                );
             }
 
             $productId = (int) $data['id_product'];
@@ -179,7 +205,8 @@ class UpdateProduct implements UpdateProductInterface
                     [],
                     [],
                     null,
-                    ["Product with entity_id {$productId} does not exist"]
+                    ["Product with entity_id {$productId} does not exist"],
+                    404
                 );
             }
 
@@ -196,7 +223,8 @@ class UpdateProduct implements UpdateProductInterface
                         [],
                         [],
                         null,
-                        ["Store with code '{$storeCode}' does not exist"]
+                        ["Store with code '{$storeCode}' does not exist"],
+                        400
                     );
                 }
             }
@@ -205,7 +233,7 @@ class UpdateProduct implements UpdateProductInterface
 
             $validationErrors = $this->validationService->validate($resolved);
             if (!empty($validationErrors)) {
-                return $this->buildResponse('error', 'Validation failed', [], [], [], null, $validationErrors);
+                return $this->buildResponse('error', 'Validation failed', [], [], [], null, $validationErrors, 422);
             }
 
             $updatedFields = [];
@@ -237,7 +265,8 @@ class UpdateProduct implements UpdateProductInterface
                     [],
                     [],
                     $productId,
-                    [$e->getMessage()]
+                    [$e->getMessage()],
+                    500
                 );
             }
 
@@ -292,7 +321,16 @@ class UpdateProduct implements UpdateProductInterface
             );
         } catch (\Exception $e) {
             $this->generalHelper->addTolog('UpdateProduct', $e->getMessage());
-            return $this->buildResponse('error', 'Internal error: ' . $e->getMessage(), [], [], [], null, [$e->getMessage()]);
+            return $this->buildResponse(
+                'error',
+                'Internal error: ' . $e->getMessage(),
+                [],
+                [],
+                [],
+                null,
+                [$e->getMessage()],
+                500
+            );
         }
     }
 
@@ -473,6 +511,7 @@ class UpdateProduct implements UpdateProductInterface
      * @param array $failedFields
      * @param int|null $productId
      * @param array $errors
+     * @param int $httpCode
      * @return string
      */
     private function buildResponse(
@@ -482,8 +521,11 @@ class UpdateProduct implements UpdateProductInterface
         array $warnings = [],
         array $failedFields = [],
         $productId = null,
-        array $errors = []
+        array $errors = [],
+        int $httpCode = 200
     ) {
+        $this->restResponse->setHttpResponseCode($httpCode);
+
         $response = [
             'status' => $status,
             'message' => $message,

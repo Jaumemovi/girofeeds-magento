@@ -158,7 +158,9 @@ class Products
      */
     public function getAttributes($selectedAttrs)
     {
-        $attributes = $this->getProductAttributes();
+        // Always load every product attribute so the API can expose full product data.
+        $attributes = ['*'];
+        $attributes = array_merge($attributes, $this->getProductAttributes());
         foreach ($selectedAttrs as $selectedAtt) {
             if (!empty($selectedAtt['source'])) {
                 if (empty($selectedAtt['inventory'])) {

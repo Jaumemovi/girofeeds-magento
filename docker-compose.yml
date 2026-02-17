@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+        codex:
+                image: benyamin/codex-sandbox:latest
+                environment:
+                        - OPENAI_API_KEY=${OPENAI_API_KEY}
+                volumes:
+                        - .:/workspace
+                working_dir: /workspace
+                stdin_open: true
+                tty: true
+                
+

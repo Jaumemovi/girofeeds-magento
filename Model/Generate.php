@@ -140,11 +140,67 @@ class Generate
     {
         if ($dataRow = $this->productHelper->getDataRow($product, $parent, $config)) {
             if ($row = $this->sourceHelper->reformatData($dataRow, $product, $parent, $config)) {
-                return $row;
+                return $this->appendAllProductAttributes($row, $product, $parent);
             }
         }
 
         return null;
+    }
+
+    private function appendAllProductAttributes(array $row, Product $product, ?Product $parent): array
+    {
+        $productData = $this->normalizeProductData($product->getData());
+        $parentData = $parent ? $this->normalizeProductData($parent->getData()) : [];
+
+        foreach ($productData as $code => $value) {
+            if (!array_key_exists($code, $row)) {
+                $row[$code] = $value;
+            }
+        }
+
+        foreach ($parentData as $code => $value) {
+            if (!array_key_exists($code, $row) && !array_key_exists($code, $productData)) {
+                $row[$code] = $value;
+            }
+        }
+
+        return $row;
+    }
+
+    private function normalizeProductData(array $data): array
+    {
+        unset($data['extension_attributes']);
+        $normalized = [];
+
+        foreach ($data as $code => $value) {
+            if ($value === null || is_scalar($value)) {
+                $normalized[$code] = $value;
+                continue;
+            }
+
+            if (is_array($value)) {
+                $normalized[$code] = $this->normalizeArrayValue($value);
+            }
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeArrayValue(array $value): array
+    {
+        $normalized = [];
+        foreach ($value as $key => $item) {
+            if ($item === null || is_scalar($item)) {
+                $normalized[$key] = $item;
+                continue;
+            }
+
+            if (is_array($item)) {
+                $normalized[$key] = $this->normalizeArrayValue($item);
+            }
+        }
+
+        return $normalized;
     }
 
     private function prefetchData(

@@ -34,11 +34,6 @@ class FieldProcessor
     ];
 
     /**
-     * @var array
-     */
-    private $valueConversionFields = ['active', 'visible'];
-
-    /**
      * Resolve fields from data
      *
      * @param array $data
@@ -97,6 +92,17 @@ class FieldProcessor
             $resolved['special_price'] = $this->processSpecialPrice($resolved['special_price']);
         }
 
+        foreach (['price', 'cost'] as $moneyField) {
+            if (!array_key_exists($moneyField, $resolved)) {
+                continue;
+            }
+
+            $normalized = $this->extractNumericAmount($resolved[$moneyField]);
+            if ($normalized !== null) {
+                $resolved[$moneyField] = $normalized;
+            }
+        }
+
         return $resolved;
     }
 
@@ -139,6 +145,60 @@ class FieldProcessor
         if ($value === null || $value === '' || $value === 0 || $value === '0') {
             return null;
         }
-        return (float) $value;
+
+        $normalized = $this->extractNumericAmount($value);
+        if ($normalized !== null) {
+            return $normalized;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Extract numeric amount from a string like "397.00 EUR" or "EUR 397,00".
+     *
+     * @param mixed $value
+     * @return float|null
+     */
+    private function extractNumericAmount($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        if (!preg_match('/-?\d[\d.,]*/', $value, $matches)) {
+            return null;
+        }
+
+        $number = $matches[0];
+        $hasDot = strpos($number, '.') !== false;
+        $hasComma = strpos($number, ',') !== false;
+
+        if ($hasDot && $hasComma) {
+            $lastDot = strrpos($number, '.');
+            $lastComma = strrpos($number, ',');
+            if ($lastComma > $lastDot) {
+                $number = str_replace('.', '', $number);
+                $number = str_replace(',', '.', $number);
+            } else {
+                $number = str_replace(',', '', $number);
+            }
+        } elseif ($hasComma) {
+            $number = str_replace(',', '.', $number);
+        }
+
+        if (!is_numeric($number)) {
+            return null;
+        }
+
+        return (float) $number;
     }
 }
