@@ -67,6 +67,8 @@ class Source extends AbstractHelper
     const XPATH_GROUPED_PARENT_PRICE = 'girofeeds_productapi/types/grouped_parent_price';
     const XPATH_GROUPED_PARENT_ATTS = 'girofeeds_productapi/types/grouped_parent_atts';
     const XPATH_GROUPED_NONVISIBLE = 'girofeeds_productapi/types/grouped_nonvisible';
+    const XPATH_ORDERS_COUNT_ENABLE = 'girofeeds_productapi/orders_count/enable';
+    const XPATH_ORDERS_COUNT_STATUSES = 'girofeeds_productapi/orders_count/order_statuses';
 
     private $generalHelper;
     private $productHelper;
@@ -112,6 +114,17 @@ class Source extends AbstractHelper
                 'base_url' => $this->storeManager->getStore()->getBaseUrl(),
                 'weight_unit' => ' ' . $this->getStoreValue(self::XPATH_WEIGHT_UNIT),
             ];
+
+            $ordersCountEnabled = (bool) $this->getStoreValue(self::XPATH_ORDERS_COUNT_ENABLE);
+            if ($ordersCountEnabled) {
+                $statuses = $this->getStoreValue(self::XPATH_ORDERS_COUNT_STATUSES);
+                $config['orders_count'] = [
+                    'enable' => true,
+                    'statuses' => !empty($statuses) ? explode(',', $statuses) : [],
+                ];
+            } else {
+                $config['orders_count'] = ['enable' => false, 'statuses' => []];
+            }
         }
 
         $this->storeId = null;

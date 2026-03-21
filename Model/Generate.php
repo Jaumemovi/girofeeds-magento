@@ -15,6 +15,7 @@ use Girofeeds\ProductApi\Helper\Product as ProductHelper;
 use Girofeeds\ProductApi\Helper\Source as SourceHelper;
 use Girofeeds\ProductApi\Model\Collection\Products as ProductsModel;
 use Girofeeds\ProductApi\Service\Category\CategoryData;
+use Girofeeds\ProductApi\Service\Product\OrderCountData;
 
 class Generate
 {
@@ -26,6 +27,7 @@ class Generate
     private $feedHelper;
     private $categoryData;
     private $appEmulation;
+    private $orderCountData;
 
     public function __construct(
         ProductsModel $productModel,
@@ -34,7 +36,8 @@ class Generate
         GeneralHelper $generalHelper,
         FeedHelper $feedHelper,
         CategoryData $categoryData,
-        Emulation $appEmulation
+        Emulation $appEmulation,
+        OrderCountData $orderCountData
     ) {
         $this->productModel = $productModel;
         $this->productHelper = $productHelper;
@@ -43,6 +46,7 @@ class Generate
         $this->feedHelper = $feedHelper;
         $this->categoryData = $categoryData;
         $this->appEmulation = $appEmulation;
+        $this->orderCountData = $orderCountData;
     }
 
     public function generateByStore(
@@ -140,7 +144,15 @@ class Generate
     {
         if ($dataRow = $this->productHelper->getDataRow($product, $parent, $config)) {
             if ($row = $this->sourceHelper->reformatData($dataRow, $product, $parent, $config)) {
-                return $this->appendAllProductAttributes($row, $product, $parent);
+                $row = $this->appendAllProductAttributes($row, $product, $parent);
+
+                if (!empty($config['orders_count']['enable'])) {
+                    $row = array_merge($row, $this->orderCountData->getOrderCounts(
+                        (int) $product->getEntityId()
+                    ));
+                }
+
+                return $row;
             }
         }
 
@@ -210,5 +222,10 @@ class Generate
     ) {
         $this->productHelper->getInventoryData()->load($products->getColumnValues('sku'), $config);
         $this->productHelper->getMediaData()->load($products, $parents);
+
+        if (!empty($config['orders_count']['enable']) && !empty($config['orders_count']['statuses'])) {
+            $productIds = array_map('intval', $products->getColumnValues('entity_id'));
+            $this->orderCountData->load($productIds, $config);
+        }
     }
 }
