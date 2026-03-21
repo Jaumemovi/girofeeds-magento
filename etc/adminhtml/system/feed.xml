@@ -259,6 +259,26 @@
             </field>
         </group>
 
+        <group id="orders_count" translate="label comment" type="text" sortOrder="45" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>Order Count in Feed</label>
+            <comment><![CDATA[Include order count fields (orders_1d, orders_7d, orders_30d, orders_90d, orders_365d) for each product in the feed.]]></comment>
+            <field id="enable" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Enable</label>
+                <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                <config_path>girofeeds_productapi/orders_count/enable</config_path>
+                <comment>Enable to add order count fields to the product feed output.</comment>
+            </field>
+            <field id="order_statuses" translate="label comment" type="multiselect" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Order Statuses</label>
+                <source_model>Magento\Sales\Model\Config\Source\Order\Status</source_model>
+                <config_path>girofeeds_productapi/orders_count/order_statuses</config_path>
+                <comment>Select which order statuses to include when counting orders per product.</comment>
+                <depends>
+                    <field id="enable">1</field>
+                </depends>
+            </field>
+        </group>
+
         <group id="extra_fields" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Extra Attribute Mappings</label>
             <comment>Add custom attribute mappings to enrich your product data in the feed.</comment>

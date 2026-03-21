@@ -37,6 +37,10 @@
                 <bundle>parent</bundle>
                 <grouped>parent</grouped>
             </types>
+            <orders_count>
+                <enable>0</enable>
+                <order_statuses/>
+            </orders_count>
             <filter>
                 <visibility_enabled>1</visibility_enabled>
                 <visibility>2,4</visibility>
