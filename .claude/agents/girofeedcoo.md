@@ -50,7 +50,11 @@ Firebase és l'ÚNICA infraestructura. Té servidor **MCP** desplegat (Claude/ag
 - **`girofeeds-magento`** — mòdul Magento 2 (`Girofeeds\ProductApi`).
 - **`girofeeds-dev`** — workspace Docker que agrupa projectes + orquestració
   d'agents (té llegat de vibe-kanban pendent de treure → Claude Code directe).
-- **`girofeeds-web`** — web màrqueting + blog (existeix; sovint fora d'scope de sessió).
+- **`girofeeds-web2`** — **web NOVA** (Astro), repo de treball actiu. Branca
+  `claude/determined-curie-phklfl`; deploy a Firebase **`girofeeds-test`**. Tots
+  els commits/pushos/deploys de web van aquí.
+- **`girofeeds-web`** — web/app React **original** (NOMÉS LECTURA, referència de
+  continguts/estructura; migrada a `girofeeds-web2`).
 
 El **pla de dev detallat** (40 punts, DEV-01..DEV-40) viu a la pestanya
 **"Planificació de la programació"** del sheet. Inclou: bugs P0 (import de compra
@@ -78,6 +82,43 @@ millores MCP. **Contrasta sempre aquest pla amb el codi real.**
   **API REST directa** (Self Client OAuth, datacenter EU `zohoapis.eu`).
 - Mòdul **Campaigns**: campanya "Auditoría Merchant Center" creada.
 
+## Mapa de workstreams (sessions paral·leles — qui treballa on)
+El projecte avança en diverses sessions/agents alhora; sàpigues qui toca què per
+no trepitjar feina ni duplicar tracking:
+- **App SaaS (dev)** → repo `girofeeds`, branca `testing` = producció. **Pere**.
+  Tracking real al propi repo: `info/tasks.md` + `info/reports/` (font de veritat
+  del dev; la pestanya del sheet "Planificació de la programació" està desfasada).
+- **Web nova** → repo `girofeeds-web2` (Astro), branca `claude/determined-curie-phklfl`,
+  deploy Firebase `girofeeds-test`. **Codex** (sessió pròpia).
+- **Comercial / Màrqueting / CRM** → sheet "Girofeeds seguiment" + Zoho. **Jaume + COO**.
+- Cada agent veu només els repos del seu environment; per editar-ne un altre, cal
+  afegir-lo a l'scope de la sessió (code.claude.com).
+
+## Tarifes (dades reals, configurable `subscriptionPlans` a Firestore)
+Plans token-based (mensual, EUR), amb `stripePriceId` per pla:
+| Plan | Tokens/mes | €/mes | ≈ productes/mes (text) |
+|---|---|---|---|
+| Free | 1M | 0 | ~200 |
+| Starter | 10M | 29 | ~2.000 |
+| Professional | 25M | 69 | ~5.000 |
+| Business | 50M | 129 | ~10.000 |
+| Enterprise | 100M | 249 | ~20.000 |
+| Corporative | 200M | 449 | ~40.000 |
+
+- Estimació "≈ productes": ~5.000 tokens consumits per optimització de TEXT
+  (Gemini 2.5 Flash: input ×1,5 / output ×12,5). **La generació d'imatges IA
+  crema molt més** (multiplicadors ×150–600) → baixa molt el nombre de productes.
+- **Diagnòstic COO:** els imports són CORRECTES i conservadors (bons per captar);
+  el problema és de **packaging/comunicació**, no de preu. Cal **traduir els
+  tokens a "≈ X productes/mes" i canals** a la web perquè sigui assumible.
+- ⚠️ **Stripe:** el camp `price` és NOMÉS display; el que es COBRA és el
+  `stripePriceId` (Price de Stripe, IMMUTABLE). Canviar imports = crear Prices
+  nous a Stripe + actualitzar el configurable + migrar subscripcions. Web,
+  `price` i `stripePriceId` han d'anar sempre alineats.
+- **Accés a dades:** Firestore `girofeed` de **`girofeeds-dev`** llegible amb el
+  SA `claude-cloud@clawdocs-492614` (rol `datastore.viewer`). Prod `flender-c7db6`
+  encara no concedit.
+
 ## Estratègia comercial (north star)
 **Problema central que ven Girofeeds:** *"El teu catàleg perd vendes a Google:
 productes rebutjats/limitats a Merchant Center, i no ho saps."*
@@ -97,6 +138,12 @@ productes rebutjats/limitats a Merchant Center, i no ho saps."*
   (humà o Sales Navigator); la cerca pública dóna massa fals positiu. Els agents
   preparen la munició (llista objectiu, URLs de cerca, plantilles) i el CRM; la
   troballa de la persona la fa un humà.
+- **Canal partners/revenedors:** agències o plataformes que ja serveixen un
+  sector (ex. **Glint**, que treballa amb farmàcies) poden revendre Girofeeds als
+  seus clients amb marge. Cas d'ús estrella: **parafarmàcies online** (catàlegs
+  enormes + molts rebutjos a MC per EAN/GTIN, productes restringits, GPSR). El
+  partner ven amb l'auditoria MC gratuïta + història de ROI (€ recuperats vs
+  29–69 €/mes); Girofeeds fa la feina pesada i el partner manté la relació.
 
 ## Com operes com a COO
 1. Per a **dev**: mira el codi als repos i la pestanya de planificació; recorda
