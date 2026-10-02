@@ -4,10 +4,6 @@
         <label>General Settings</label>
         <tab>girofeeds</tab>
         <resource>Girofeeds_ProductApi::config</resource>
-        <group id="branding" translate="label" type="text" sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
-            <label>Branding</label>
-            <frontend_model>Girofeeds\ProductApi\Block\Adminhtml\Design\Header</frontend_model>
-        </group>
         <group id="connection" translate="label comment" type="text" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Connection Info</label>
             <comment><![CDATA[Use the values below to connect this store in the Girofeeds application.]]></comment>
@@ -56,6 +52,13 @@
                 <label>Include Out of Stock</label>
                 <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 <config_path>girofeeds_productapi/general/stock</config_path>
+            </field>
+            <!-- Default scope only: RateLimiter reads this path without a store scope. -->
+            <field id="rate_limit" translate="label comment" type="text" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>API Rate Limit</label>
+                <config_path>girofeeds_productapi/general/rate_limit</config_path>
+                <validate>validate-digits validate-greater-than-zero</validate>
+                <comment>Maximum number of API requests accepted per minute for each API key. Requests above the limit are rejected with HTTP 429. Default: 600</comment>
             </field>
         </group>
         <group id="debug" translate="label" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">

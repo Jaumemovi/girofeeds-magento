@@ -4,11 +4,6 @@
         <label>Product Feed</label>
         <tab>girofeeds</tab>
         <resource>Girofeeds_ProductApi::config</resource>
-        <group id="branding" translate="label" type="text" sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
-            <label>Branding</label>
-            <frontend_model>Girofeeds\ProductApi\Block\Adminhtml\Design\Header</frontend_model>
-        </group>
-
         <group id="data" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Product Data Settings</label>
             <comment>Connect the right attributes for the basic product values to the feed.</comment>

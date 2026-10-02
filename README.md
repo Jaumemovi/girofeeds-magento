@@ -244,6 +244,18 @@ bin/magento cache:flush
 
 Go to **Stores > Configuration > Girofeeds > Product API** to configure the module.
 
+### API Rate Limit
+
+**General Settings > General > API Rate Limit** sets how many API requests per minute are
+accepted for each API key (default: 600). Requests above the limit get HTTP 429
+`Rate limit exceeded`. The value is stored in `girofeeds_productapi/general/rate_limit`
+(default scope) and can also be set from the CLI:
+
+```bash
+bin/magento config:set girofeeds_productapi/general/rate_limit 600
+bin/magento cache:clean config
+```
+
 ## CLI Commands
 
 ```bash
