@@ -12,7 +12,7 @@ class RateLimiter
     private const CACHE_PREFIX = 'girofeeds_rate_';
     private const TTL_SECONDS = 60;
     private const XML_PATH_RATE_LIMIT = 'girofeeds_productapi/general/rate_limit';
-    private const DEFAULT_MAX_REQUESTS = 60;
+    private const DEFAULT_MAX_REQUESTS = 600;
 
     /**
      * @var CacheInterface
