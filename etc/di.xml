@@ -6,6 +6,8 @@
                 type="Girofeeds\ProductApi\Model\Log\Repository"/>
     <preference for="Girofeeds\ProductApi\Api\UpdateProductInterface"
                 type="Girofeeds\ProductApi\Model\UpdateProduct"/>
+    <preference for="Girofeeds\ProductApi\Api\CreateProductInterface"
+                type="Girofeeds\ProductApi\Model\CreateProduct"/>
     <preference for="Girofeeds\ProductApi\Api\CountInterface"
                 type="Girofeeds\ProductApi\Model\Count"/>
     <preference for="Girofeeds\ProductApi\Api\TestInterface"
