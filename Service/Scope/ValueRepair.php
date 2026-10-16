@@ -23,6 +23,16 @@ class ValueRepair
     const KIND_GLOBAL_BEFORE = 'global_before';
     const KIND_GLOBAL_CREATED = 'global_created';
 
+    /** Promote every differing value (overwrite or create the global row), then delete the store rows */
+    const MODE_FULL = 'full';
+    /** Create only the missing global rows (never overwrite one), then delete the store rows */
+    const MODE_MISSING_ONLY = 'missing_only';
+    /** Only delete the store rows */
+    const MODE_CLEANUP = 'cleanup';
+
+    /** catalog_eav_attribute.is_global value of the Global scope */
+    const SCOPE_GLOBAL = 1;
+
     const SAMPLE_SIZE = 5;
 
     const MAX_TABLE_NAME_LENGTH = 64;
@@ -110,12 +120,14 @@ class ValueRepair
     /**
      * Rows of the store view per attribute, how many differ from the global value and samples.
      *
-     * A missing global row counts as differing. Values are compared byte by byte (BINARY), so
-     * case or trailing space changes are differences.
+     * 'different' counts store rows whose global row exists with another value, 'missing' those
+     * without a global row; 'differing' is their sum. Values are compared byte by byte (BINARY),
+     * so case or trailing space changes are differences.
      *
      * @param int $storeId
      * @param array $attributes code => attribute (EAV backend types only)
-     * @return array list of ['attribute' => array, 'table' => string, 'rows' => int, 'differing' => int, 'samples' => array]
+     * @return array list of ['attribute' => array, 'table' => string, 'rows' => int, 'different' => int,
+     *               'missing' => int, 'differing' => int, 'samples' => array]
      */
     public function analyze(int $storeId, array $attributes): array
     {
@@ -150,9 +162,11 @@ class ValueRepair
                 continue;
             }
 
-            $differing = $connection->fetchPairs(
+            $differing = [];
+            $differingRows = $connection->fetchAll(
                 sprintf(
-                    'SELECT s.attribute_id, COUNT(*) FROM %1$s AS s'
+                    'SELECT s.attribute_id, SUM(g.value_id IS NULL) AS missing,'
+                    . ' SUM(g.value_id IS NOT NULL) AS different FROM %1$s AS s'
                     . ' LEFT JOIN %1$s AS g ON g.entity_id = s.entity_id AND g.attribute_id = s.attribute_id'
                     . ' AND g.store_id = 0'
                     . ' WHERE s.store_id = ? AND s.attribute_id IN (%2$s)'
@@ -163,10 +177,18 @@ class ValueRepair
                 ),
                 array_merge([$storeId], $ids)
             );
+            foreach ($differingRows as $row) {
+                $differing[(int) $row['attribute_id']] = [
+                    'different' => (int) $row['different'],
+                    'missing' => (int) $row['missing'],
+                ];
+            }
 
             foreach ($rowCounts as $attributeId => $count) {
                 $attributeId = (int) $attributeId;
-                $diffCount = isset($differing[$attributeId]) ? (int) $differing[$attributeId] : 0;
+                $different = isset($differing[$attributeId]) ? $differing[$attributeId]['different'] : 0;
+                $missing = isset($differing[$attributeId]) ? $differing[$attributeId]['missing'] : 0;
+                $diffCount = $different + $missing;
                 $samples = [];
                 if ($diffCount > 0) {
                     $samples = $connection->fetchAll(
@@ -189,6 +211,8 @@ class ValueRepair
                     'attribute' => $byId[$attributeId],
                     'table' => $type,
                     'rows' => (int) $count,
+                    'different' => $different,
+                    'missing' => $missing,
                     'differing' => $diffCount,
                     'samples' => $samples,
                 ];
@@ -366,15 +390,15 @@ class ValueRepair
     /**
      * Repair one batch of one attribute in a single transaction.
      *
-     * 1. back up the store rows; 2. unless $promote is false, back up the global rows that will be
-     * overwritten and record the global rows that will be created, then write the store value into
-     * store_id 0; 3. delete the store rows. Row counts are checked against the backups; any
-     * mismatch rolls the batch back.
+     * 1. back up the store rows; 2. MODE_FULL: back up the global rows that differ and overwrite
+     * them with the store value; 3. MODE_FULL and MODE_MISSING_ONLY: record and create the missing
+     * global rows with the store value (MODE_CLEANUP skips 2 and 3); 4. delete the store rows. Row
+     * counts are checked against the backups; any mismatch rolls the batch back.
      *
      * @param array $attribute
      * @param int $storeId
      * @param int[] $entityIds
-     * @param bool $promote
+     * @param string $mode one of the MODE_* constants
      * @param string $backupTable
      * @param string $createdAt
      * @return array ['deleted' => int, 'updated' => int, 'created' => int]
@@ -384,7 +408,7 @@ class ValueRepair
         array $attribute,
         int $storeId,
         array $entityIds,
-        bool $promote,
+        string $mode,
         string $backupTable,
         string $createdAt
     ): array {
@@ -400,6 +424,9 @@ class ValueRepair
         );
         $storeWhere = sprintf('s.attribute_id = ? AND s.store_id = ? AND s.entity_id IN (%s)', $in);
         $stats = ['deleted' => 0, 'updated' => 0, 'created' => 0];
+        if (!in_array($mode, [self::MODE_FULL, self::MODE_MISSING_ONLY, self::MODE_CLEANUP], true)) {
+            throw new \InvalidArgumentException(sprintf('Modo de reparación desconocido: %s', $mode));
+        }
 
         $connection->beginTransaction();
         try {
@@ -425,7 +452,7 @@ class ValueRepair
                 array_merge([self::KIND_STORE_ROW, $createdAt], $keyBind)
             )->rowCount();
 
-            if ($promote) {
+            if ($mode === self::MODE_FULL) {
                 $globalBefore = $connection->query(
                     sprintf(
                         'INSERT INTO %s %s SELECT g.value_id, g.attribute_id, g.store_id, g.entity_id, g.value, ?, ?'
@@ -437,19 +464,6 @@ class ValueRepair
                         $storeWhere
                     ),
                     array_merge([self::KIND_GLOBAL_BEFORE, $createdAt], $keyBind)
-                )->rowCount();
-
-                $globalCreated = $connection->query(
-                    sprintf(
-                        'INSERT INTO %s %s SELECT NULL, s.attribute_id, 0, s.entity_id, s.value, ?, ?'
-                        . ' FROM %s AS s LEFT JOIN %s WHERE %s AND g.value_id IS NULL',
-                        $backup,
-                        $backupColumns,
-                        $table,
-                        $globalJoin,
-                        $storeWhere
-                    ),
-                    array_merge([self::KIND_GLOBAL_CREATED, $createdAt], $keyBind)
                 )->rowCount();
 
                 $updated = $connection->query(
@@ -472,6 +486,23 @@ class ValueRepair
                     ));
                 }
 
+                $stats['updated'] = $updated;
+            }
+
+            if ($mode === self::MODE_FULL || $mode === self::MODE_MISSING_ONLY) {
+                $globalCreated = $connection->query(
+                    sprintf(
+                        'INSERT INTO %s %s SELECT NULL, s.attribute_id, 0, s.entity_id, s.value, ?, ?'
+                        . ' FROM %s AS s LEFT JOIN %s WHERE %s AND g.value_id IS NULL',
+                        $backup,
+                        $backupColumns,
+                        $table,
+                        $globalJoin,
+                        $storeWhere
+                    ),
+                    array_merge([self::KIND_GLOBAL_CREATED, $createdAt], $keyBind)
+                )->rowCount();
+
                 $created = $connection->query(
                     sprintf(
                         'INSERT INTO %s (attribute_id, store_id, entity_id, value)'
@@ -492,7 +523,6 @@ class ValueRepair
                     ));
                 }
 
-                $stats['updated'] = $updated;
                 $stats['created'] = $created;
             }
 
@@ -585,11 +615,10 @@ class ValueRepair
     /**
      * Backup rows that cannot be restored because the product, attribute or store no longer exists.
      *
-     * @param string $type
      * @param string $backupTable
      * @return int
      */
-    public function countOrphanBackupRows(string $type, string $backupTable): int
+    public function countOrphanBackupRows(string $backupTable): int
     {
         return (int) $this->getConnection()->fetchOne(
             sprintf(

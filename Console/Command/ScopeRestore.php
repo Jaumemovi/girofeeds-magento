@@ -84,7 +84,7 @@ class ScopeRestore extends Command
         foreach ($backupTables as $type => $backupTable) {
             $info = $this->valueRepair->describeBackup($backupTable);
             $stats = ['removed' => 0, 'updated' => 0, 'inserted' => 0];
-            $orphans = $this->valueRepair->countOrphanBackupRows($type, $backupTable);
+            $orphans = $this->valueRepair->countOrphanBackupRows($backupTable);
 
             try {
                 for ($from = $info['min']; $info['max'] > 0 && $from <= $info['max']; $from += self::CHUNK_SIZE) {

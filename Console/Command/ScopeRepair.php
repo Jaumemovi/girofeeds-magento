@@ -67,7 +67,14 @@ class ScopeRepair extends Command
             'exclude',
             null,
             InputOption::VALUE_REQUIRED,
-            'Comma separated attribute codes that are not promoted (store rows are only removed)'
+            'Comma separated attribute codes that are not promoted (store rows are only removed;'
+            . ' products without a global value are still promoted)'
+        );
+        $this->addOption(
+            'promote-global',
+            null,
+            InputOption::VALUE_NONE,
+            'Also promote attributes with Global scope (by default their store rows are only removed)'
         );
         $this->addOption('only', null, InputOption::VALUE_REQUIRED, 'Comma separated attribute codes to process');
         $this->addOption(
@@ -119,6 +126,7 @@ class ScopeRepair extends Command
             }
             $attributes[$code] = $attribute;
         }
+        $promoteGlobal = (bool) $input->getOption('promote-global');
 
         $storeId = (int) $store->getId();
         $output->writeln(sprintf(
@@ -135,7 +143,11 @@ class ScopeRepair extends Command
             return Cli::RETURN_SUCCESS;
         }
 
-        $this->printReport($output, $analysis, $exclude);
+        foreach ($analysis as $index => $item) {
+            $analysis[$index]['mode'] = $this->resolveMode($item['attribute'], $exclude, $promoteGlobal);
+        }
+
+        $this->printReport($output, $analysis, $promoteGlobal);
         $analyzedAttributes = [];
         foreach ($analysis as $item) {
             $analyzedAttributes[$item['attribute']['code']] = $item['attribute'];
@@ -144,7 +156,16 @@ class ScopeRepair extends Command
             'Productos con algún valor propio en la vista: %d',
             $this->valueRepair->countProducts($storeId, $analyzedAttributes)
         ));
-        $this->printWarnings($output, $analysis, $exclude);
+        $this->printWarnings($output, $analysis);
+        if ($only) {
+            $ignored = array_diff($exclude, $only);
+            if ($ignored) {
+                $output->writeln(sprintf(
+                    '<comment>Aviso: %s está en --exclude pero no en --only; no se procesa.</comment>',
+                    implode(', ', $ignored)
+                ));
+            }
+        }
 
         if (!$apply) {
             $output->writeln('');
@@ -152,18 +173,17 @@ class ScopeRepair extends Command
             return Cli::RETURN_SUCCESS;
         }
 
-        return $this->apply($output, $analysis, $exclude, $storeId, $batchSize);
+        return $this->apply($output, $analysis, $storeId, $batchSize);
     }
 
     /**
      * @param OutputInterface $output
-     * @param array $analysis
-     * @param string[] $exclude
+     * @param array $analysis items with 'mode'
      * @param int $storeId
      * @param int $batchSize
      * @return int
      */
-    private function apply(OutputInterface $output, array $analysis, array $exclude, int $storeId, int $batchSize): int
+    private function apply(OutputInterface $output, array $analysis, int $storeId, int $batchSize): int
     {
         $suffix = date('YmdHis');
         $createdAt = date('Y-m-d H:i:s');
@@ -184,7 +204,6 @@ class ScopeRepair extends Command
 
         foreach ($analysis as $item) {
             $attribute = $item['attribute'];
-            $promote = !in_array($attribute['code'], $exclude, true);
             $stats = ['deleted' => 0, 'updated' => 0, 'created' => 0];
             $lastEntityId = 0;
 
@@ -198,7 +217,7 @@ class ScopeRepair extends Command
                         $attribute,
                         $storeId,
                         $entityIds,
-                        $promote,
+                        $item['mode'],
                         $backupTables[$item['table']],
                         $createdAt
                     );
@@ -220,6 +239,7 @@ class ScopeRepair extends Command
                     'Para deshacer lo aplicado: bin/magento girofeeds:scope:restore --backup=%s',
                     $suffix
                 ));
+                $this->printPostSteps($output);
                 return Cli::RETURN_FAILURE;
             }
 
@@ -233,7 +253,7 @@ class ScopeRepair extends Command
                 $stats['deleted'],
                 $stats['updated'],
                 $stats['created'],
-                $promote ? '' : ' (excluido: solo limpieza)'
+                $this->applyNote($item['mode'])
             ));
         }
 
@@ -253,35 +273,38 @@ class ScopeRepair extends Command
 
     /**
      * @param OutputInterface $output
-     * @param array $analysis
-     * @param string[] $exclude
+     * @param array $analysis items with 'mode'
+     * @param bool $promoteGlobal
      * @return void
      */
-    private function printReport(OutputInterface $output, array $analysis, array $exclude)
+    private function printReport(OutputInterface $output, array $analysis, bool $promoteGlobal)
     {
         $table = new Table($output);
-        $table->setHeaders(['Atributo', 'Tabla', 'Ámbito', 'Filas en la vista', 'Difieren del global', 'Acción']);
-        $totalRows = 0;
-        $totalDiffering = 0;
+        $table->setHeaders(
+            ['Atributo', 'Tabla', 'Ámbito', 'Filas en la vista', 'Global distinto', 'Sin global', 'Acción']
+        );
+        $totals = ['rows' => 0, 'different' => 0, 'missing' => 0];
         foreach ($analysis as $item) {
-            $code = $item['attribute']['code'];
             $table->addRow([
-                $code,
+                $item['attribute']['code'],
                 $item['table'],
                 $this->scopeLabel($item['attribute']['is_global']),
                 (string) $item['rows'],
-                (string) $item['differing'],
-                in_array($code, $exclude, true) ? 'solo limpieza (--exclude)' : 'promocionar + limpiar',
+                (string) $item['different'],
+                (string) $item['missing'],
+                $this->actionLabel($item, $promoteGlobal),
             ]);
-            $totalRows += $item['rows'];
-            $totalDiffering += $item['differing'];
+            foreach ($totals as $key => $value) {
+                $totals[$key] = $value + $item[$key];
+            }
         }
         $table->addRow([
             'TOTAL (' . count($analysis) . ' atributos)',
             '',
             '',
-            (string) $totalRows,
-            (string) $totalDiffering,
+            (string) $totals['rows'],
+            (string) $totals['different'],
+            (string) $totals['missing'],
             '',
         ]);
         $table->render();
@@ -307,24 +330,42 @@ class ScopeRepair extends Command
 
     /**
      * @param OutputInterface $output
-     * @param array $analysis
-     * @param string[] $exclude
+     * @param array $analysis items with 'mode'
      * @return void
      */
-    private function printWarnings(OutputInterface $output, array $analysis, array $exclude)
+    private function printWarnings(OutputInterface $output, array $analysis)
     {
-        $globalScope = [];
+        $globalCleanup = [];
+        $globalLost = 0;
+        $excludedMissing = 0;
         foreach ($analysis as $item) {
-            $code = $item['attribute']['code'];
-            if ($item['attribute']['is_global'] === 1 && $item['differing'] > 0 && !in_array($code, $exclude, true)) {
-                $globalScope[] = $code;
+            if ($item['mode'] === ValueRepair::MODE_CLEANUP) {
+                $globalCleanup[] = $item['attribute']['code'];
+                $globalLost += $item['missing'];
+            } elseif ($item['mode'] === ValueRepair::MODE_MISSING_ONLY) {
+                $excludedMissing += $item['missing'];
             }
         }
-        if ($globalScope) {
+        if ($globalCleanup) {
             $output->writeln(sprintf(
-                '<comment>Aviso: atributos con ámbito Global y filas propias en la vista: %s. Al promocionar,'
-                . ' su valor global cambiará; valora incluirlos en --exclude.</comment>',
-                implode(', ', $globalScope)
+                '<comment>Aviso: %s tienen ámbito Global. La tienda solo muestra su valor de All Store Views,'
+                . ' así que sus filas de la vista no se ven: se eliminan sin promocionar (con respaldo).'
+                . ' Usa --promote-global solo si quieres que el valor de la vista pase a ser el global.</comment>',
+                implode(', ', $globalCleanup)
+            ));
+            if ($globalLost > 0) {
+                $output->writeln(sprintf(
+                    '<comment>Aviso: %d de esas filas no tienen valor global; al eliminarlas, el valor de la vista'
+                    . ' (hoy no visible) solo queda en el respaldo.</comment>',
+                    $globalLost
+                ));
+            }
+        }
+        if ($excludedMissing > 0) {
+            $output->writeln(sprintf(
+                '<comment>Aviso: %d productos de atributos en --exclude no tienen valor global; su valor de la'
+                . ' vista se promociona igualmente para no perderlo en todas las vistas.</comment>',
+                $excludedMissing
             ));
         }
 
@@ -421,12 +462,68 @@ class ScopeRepair extends Command
     }
 
     /**
+     * Global scope without --promote-global: cleanup only. Excluded: only the missing global rows
+     * are created (a value is never lost in every view). Otherwise: full promotion.
+     *
+     * @param array $attribute
+     * @param string[] $exclude
+     * @param bool $promoteGlobal
+     * @return string ValueRepair::MODE_*
+     */
+    private function resolveMode(array $attribute, array $exclude, bool $promoteGlobal): string
+    {
+        if ($attribute['is_global'] === ValueRepair::SCOPE_GLOBAL && !$promoteGlobal) {
+            return ValueRepair::MODE_CLEANUP;
+        }
+        if (in_array($attribute['code'], $exclude, true)) {
+            return ValueRepair::MODE_MISSING_ONLY;
+        }
+        return ValueRepair::MODE_FULL;
+    }
+
+    /**
+     * @param array $item analysis item with 'mode'
+     * @param bool $promoteGlobal
+     * @return string
+     */
+    private function actionLabel(array $item, bool $promoteGlobal): string
+    {
+        if ($item['mode'] === ValueRepair::MODE_CLEANUP) {
+            return 'ámbito Global: solo limpieza';
+        }
+        if ($item['mode'] === ValueRepair::MODE_MISSING_ONLY) {
+            return $item['missing'] > 0
+                ? sprintf('solo limpieza (--exclude); %d sin global se promocionan', $item['missing'])
+                : 'solo limpieza (--exclude)';
+        }
+        if ($promoteGlobal && $item['attribute']['is_global'] === ValueRepair::SCOPE_GLOBAL) {
+            return 'promocionar + limpiar (ámbito Global: se promociona por --promote-global)';
+        }
+        return 'promocionar + limpiar';
+    }
+
+    /**
+     * @param string $mode
+     * @return string
+     */
+    private function applyNote(string $mode): string
+    {
+        if ($mode === ValueRepair::MODE_CLEANUP) {
+            return ' (ámbito Global: solo limpieza)';
+        }
+        if ($mode === ValueRepair::MODE_MISSING_ONLY) {
+            return ' (excluido: solo limpieza; creados = productos sin global promocionados)';
+        }
+        return '';
+    }
+
+    /**
      * @param int|null $isGlobal
      * @return string
      */
     private function scopeLabel($isGlobal): string
     {
-        if ($isGlobal === 1) {
+        if ($isGlobal === ValueRepair::SCOPE_GLOBAL) {
             return 'Global';
         }
         if ($isGlobal === 2) {

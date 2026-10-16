@@ -294,7 +294,7 @@ deja de reflejar lo que se edita en **All Store Views**. Este comando lleva a Al
 (`store_id 0`) los valores propios de una vista y después los elimina de la vista.
 
 ```bash
-bin/magento girofeeds:scope:repair --store=default [--dry-run] [--apply] [--exclude=attr1,attr2] [--only=attr1,attr2] [--batch-size=500]
+bin/magento girofeeds:scope:repair --store=default [--dry-run] [--apply] [--exclude=attr1,attr2] [--only=attr1,attr2] [--promote-global] [--batch-size=500]
 bin/magento girofeeds:scope:restore --backup=<sufijo>
 ```
 
@@ -304,7 +304,14 @@ bin/magento girofeeds:scope:restore --backup=<sufijo>
 - Por producto y atributo: si el valor de la vista difiere del global (o no hay global), pasa a
   ser el valor global; después se elimina la fila de la vista. Si es igual, solo se elimina.
 - `--exclude`: atributos que **no** se promocionan (All Store Views conserva su valor; la vista
-  solo deja de pisarlo). `--only`: limita la operación a esos atributos.
+  solo deja de pisarlo). Excepción: los productos que no tienen valor global sí se promocionan,
+  para que el valor no desaparezca de todas las vistas. `--only`: limita la operación a esos
+  atributos.
+- Atributos con ámbito **Global**: Magento solo lee su valor de All Store Views, así que las
+  filas de la vista no se ven en la tienda. Por defecto solo se eliminan (con respaldo), sin
+  promocionar. `--promote-global` las promociona como al resto: úsalo solo si el valor de la
+  vista es el que debe pasar a verse. Si además están en `--exclude`, sin `--promote-global`
+  siguen siendo solo limpieza.
 - Sin `--apply` es una simulación que no escribe nada.
 - Solo Magento Open Source: en Adobe Commerce con staging (`row_id`) aborta sin hacer nada.
 
@@ -312,12 +319,15 @@ Protocolo:
 
 1. **Copia de seguridad completa de la BD** (en producción, además del respaldo del comando).
 2. Simulación: `bin/magento girofeeds:scope:repair --store=default`. Revisa la tabla (por
-   atributo: filas en la vista, cuántas difieren del global, ámbito) y los ejemplos
-   (id · valor de la vista · valor global). Decide con el cliente qué atributos van en
-   `--exclude`: los que se han editado en All Store Views después del guardado erróneo
-   (p. ej. `is_discontinued`, `availability`, `special_from_date`, `special_to_date`) y los
-   que el aviso marca con ámbito Global.
-3. Aplicar fuera de horario:
+   atributo: filas en la vista, cuántas tienen un global distinto, cuántas no tienen global,
+   ámbito y acción) y los ejemplos (id · valor de la vista · valor global). Decide con el
+   cliente qué atributos van en `--exclude`: los que se han editado en All Store Views después
+   del guardado erróneo (p. ej. `is_discontinued`, `availability`, `special_from_date`,
+   `special_to_date`). Revisa los atributos marcados «ámbito Global: solo limpieza» y los
+   avisos sobre productos sin valor global.
+3. Aplicar fuera de horario, con la sincronización de Girofeeds y los cron que editan productos
+   en pausa (las filas de vista escritas durante la ejecución en productos ya procesados no se
+   reparan):
    `bin/magento girofeeds:scope:repair --store=default --exclude=... --apply`.
    Cada lote de `--batch-size` productos de un atributo es una transacción; si un lote falla se
    revierte y el comando se detiene. Antes de escribir guarda las filas de la vista que borra,
