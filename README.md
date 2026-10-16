@@ -1,6 +1,8 @@
 # Girofeeds Product API for Magento 2
 
-Product feed export and update REST API endpoints for Magento 2.
+Product feed export, update and creation REST API endpoints for Magento 2.
+
+Versión actual: 1.26.0
 
 ## Installation
 
@@ -351,6 +353,137 @@ hecho varias reparaciones, restaurar en orden inverso. Después, reindexar y `ca
 en el paso 4. Las tablas de respaldo no se borran solas: eliminarlas a mano cuando ya no hagan
 falta.
 
+## Create product
+
+Girofeeds can create new **simple** products in the store (capability `createproduct`, reported
+by the test endpoint). One product per request:
+
+| Method | URL |
+|--------|-----|
+| POST | `/rest/all/V1/girofeeds/createproduct?key={key}` |
+| POST | `/girofeeds/createproduct/index?key={key}` |
+
+The product is always created at **All Store Views** (`store_id 0`). A `store` query parameter
+or a `store` / `store_id` field is **ignored on create** and only produces the warning
+`store: ignored on create (products are created at store 0)`.
+
+Payload (same field names and aliases as `updateproduct`; `sku`, `name` and `price` are
+required):
+
+```json
+{
+  "sku": "GF-0001",
+  "name": "Camiseta básica algodón",
+  "price": 19.9,
+  "special_price": 14.9,
+  "description": "<p>Camiseta de algodón 100%.</p>",
+  "short_description": "Camiseta de algodón",
+  "ean": "8412345678901",
+  "brand": "Girofeeds",
+  "color": "Rojo",
+  "weight": 0.2,
+  "qty": 25,
+  "category": "Ropa > Camisetas",
+  "attribute_set": "Default",
+  "status": 1,
+  "images": [
+    { "filename": "camiseta-roja.jpg", "mimeType": "image/jpeg", "content": "<base64>" }
+  ]
+}
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "status": "created",
+  "message": "Product 2045 created successfully",
+  "product_id": 2045,
+  "sku": "GF-0001",
+  "url_key": "camiseta-basica-algodon",
+  "store_id": 0,
+  "warnings": [],
+  "images": { "added": 1, "failed": 0 }
+}
+```
+
+- `status`: `created`, `exists` (the product was already there; nothing is written) or `error`.
+  `failed_fields` appears when a field could not be applied (e.g. a select option that does not
+  exist; options are never created). `error` responses carry `errors` and, when known, `sku`.
+- **Idempotent**: before writing, the SKU is looked up and, when **Data > EAN attribute** is
+  configured and the request has `ean`, the EAN too. A match returns `exists` with the existing
+  `product_id`, its real `sku` and `url_key`.
+- `url_key`: the one received or the name, formatted. If another product already uses it at
+  store 0, it is suffixed with `-<sku>`. If the save still hits a URL rewrite collision (another
+  store view, a category or CMS path), the product is rebuilt and saved once more with the
+  suffix, with the warning `url_key: collision, suffixed`.
+- Categories: `category_ids` or `category` paths (`A > B`), like `updateproduct`. A path that
+  does not exist is skipped with a warning; the product is still created.
+- Stock: `qty` (default 0) and `manage_stock` (default 1); `is_in_stock` follows `qty > 0`.
+- After the save the product row is reindexed (price, EAV, flat, fulltext) for the indexers that
+  are not in "Update by Schedule" mode.
+
+HTTP codes: 400 invalid JSON, 401/403 API key, 422 validation (`missing: sku|name|price`,
+`price` ≤ 0, `attribute set not found`), 429 rate limit, 500 save or internal error.
+
+**Limits**
+
+- `images`: list of `{filename, mimeType, content}` with base64 `content`; a single object is
+  also accepted. At most **10** images (the rest are skipped with a warning), **10 MB** each
+  decoded, mimeType `image/jpeg`, `image/jpg`, `image/png`, `image/webp` or `image/gif`. The
+  first image is the base image (image, small_image, thumbnail); the rest go to the gallery.
+  Invalid entries are counted in `images.failed` with a warning `image #N: …`.
+- Only simple products (`type_id` = `simple`).
+- The request body must fit the web server and PHP limits (`client_max_body_size`,
+  `post_max_size`): 10 images of several MB in base64 can exceed the defaults.
+
+**Defaults** (**General Settings > Product Creation**, default scope only):
+
+| Setting | Path | Default | Used when |
+|---------|------|---------|-----------|
+| Attribute Set | `girofeeds_productapi/create/attribute_set` | `4` (Default) | the request has no `attribute_set` (name or id) |
+| Website IDs | `girofeeds_productapi/create/website_ids` | empty = website of the default store view | the request has no valid `website_ids` |
+| Tax Class | `girofeeds_productapi/create/tax_class_id` | `2` (Taxable Goods) | the request has no valid `tax_class_id` |
+| Visibility | `girofeeds_productapi/create/visibility` | `4` (Catalog, Search) | the request has no `visibility` |
+
+Unknown `website_ids` (request or config) are dropped with the warning
+`website_ids: unknown id N`; if none remain, the website of the default store view is used. The
+test endpoint reports these values in `create_defaults`.
+
+```bash
+bin/magento config:set girofeeds_productapi/create/attribute_set 4
+bin/magento config:set girofeeds_productapi/create/website_ids 1
+bin/magento config:set girofeeds_productapi/create/tax_class_id 2
+bin/magento config:set girofeeds_productapi/create/visibility 4
+bin/magento cache:clean config
+```
+
+### Prueba en testo3
+
+1. Instalar la versión 1.26.0 (ZIP `girofeeds-magento-1.26.0.zip` en
+   `app/code/Girofeeds/ProductApi`) y ejecutar:
+
+   ```bash
+   bin/magento setup:upgrade
+   bin/magento setup:di:compile
+   bin/magento cache:flush
+   ```
+
+2. `GET /rest/all/V1/girofeeds/test?key=<key>` → `version` 1.26.0, `capabilities`
+   incluye `createproduct` y `create_defaults` muestra los valores configurados.
+3. Crear un producto con **2 imágenes** (`POST /rest/all/V1/girofeeds/createproduct?key=<key>`,
+   SKU nuevo, `qty` > 0) → `status: created`, `images.added: 2`. En el admin, en **All Store
+   Views**: el producto existe con nombre, precio, website, las 2 imágenes en la galería (la
+   primera como base) y stock con la cantidad enviada y «En stock». Comprobar también que se ve
+   en la tienda (URL `url_key`.html o búsqueda).
+4. Repetir **la misma petición** → `status: exists`, mismo `product_id`, sin cambios en el
+   producto ni imágenes duplicadas.
+5. SKU nuevo con `"category": "Ruta > Inexistente"` → `status: created` con un aviso de
+   categoría no encontrada en `warnings` (`Category path 'Ruta > Inexistente' not found…`).
+6. SKU nuevo con `"attribute_set": "NoExiste"` → HTTP 422, `status: error`,
+   `message: attribute set not found`; no se crea nada.
+7. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
+
 ## CLI Commands
 
 ```bash
@@ -360,6 +493,7 @@ bin/magento girofeeds:selftest              # Run self-test
 bin/magento girofeeds:scope:repair --store=default          # Report own store view values (dry-run)
 bin/magento girofeeds:scope:repair --store=default --apply  # Promote them to All Store Views (with backup)
 bin/magento girofeeds:scope:restore --backup=<suffix>       # Undo a repair
+bin/magento config:set girofeeds_productapi/create/<field> <value>  # Product creation defaults (see Create product)
 ```
 
 ## API Endpoints
@@ -370,6 +504,7 @@ bin/magento girofeeds:scope:restore --backup=<suffix>       # Undo a repair
 |--------|-----|-------------|
 | GET | `/girofeeds/feed/json?id={storeId}&token={key}` | Product feed |
 | POST | `/girofeeds/updateproduct/index?key={key}` | Update product |
+| POST | `/girofeeds/createproduct/index?key={key}` | Create product |
 | GET | `/girofeeds/count/index?key={key}` | Product count |
 | GET | `/girofeeds/test/index?key={key}` | Module test |
 
@@ -380,6 +515,7 @@ bin/magento girofeeds:scope:restore --backup=<suffix>       # Undo a repair
 | GET | `/rest/V1/girofeeds/count` | Product count |
 | GET | `/rest/V1/girofeeds/test` | Module test |
 | POST | `/rest/V1/girofeeds/updateproduct` | Update product |
+| POST | `/rest/V1/girofeeds/createproduct` | Create product (always at store 0; use `/rest/all/...`) |
 
 ## Compatibility
 
