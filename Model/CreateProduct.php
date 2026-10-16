@@ -27,6 +27,7 @@ use Magento\Eav\Model\ResourceModel\Entity\Attribute\Set\CollectionFactory as At
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Webapi\Rest\Response as RestResponse;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\UrlRewrite\Model\Exception\UrlAlreadyExistsException;
 
 /**
  * Creates one simple product per request, always at store 0 (All Store Views).
@@ -279,6 +280,7 @@ class CreateProduct implements CreateProductInterface
             );
         }
 
+        $sku = null;
         try {
             $data = json_decode((string) $this->request->getContent(), true);
             if (!is_array($data)) {
@@ -348,7 +350,7 @@ class CreateProduct implements CreateProductInterface
                     'exists',
                     "Product already exists with ID {$existingId}",
                     $existingId,
-                    $sku,
+                    $this->getExistingSku($existingId, $sku),
                     $this->getExistingUrlKey($existingId),
                     $this->sanitizeWarnings($warnings),
                     [],
@@ -374,99 +376,45 @@ class CreateProduct implements CreateProductInterface
                 );
             }
 
-            /** @var \Magento\Catalog\Model\Product $product */
-            $product = $this->productFactory->create();
-            $product->setStoreId(self::ADMIN_STORE_ID);
-            $product->setTypeId('simple');
-            $product->setAttributeSetId($attributeSetId);
-            $product->setSku($sku);
-            $product->setName($resolved['name']);
-            $product->setPrice((float) $resolved['price']);
-            $product->setStatus($this->normalizeStatus(array_key_exists('status', $resolved) ? $resolved['status'] : 1));
-            $product->setVisibility(
-                array_key_exists('visibility', $resolved)
-                    ? (int) $resolved['visibility']
-                    : $this->generalHelper->getCreateVisibility()
-            );
-            $product->setWebsiteIds($this->resolveWebsiteIds($resolved, $warnings));
-            $product->setTaxClassId($this->resolveTaxClassId($resolved, $warnings));
-            if (array_key_exists('weight', $resolved)) {
-                $product->setWeight((float) $resolved['weight']);
-            }
-            if (array_key_exists('description', $resolved)) {
-                $product->setDescription($resolved['description']);
-            }
-            if (array_key_exists('short_description', $resolved)) {
-                $product->setShortDescription($resolved['short_description']);
-            }
-            $urlKey = $this->resolveUrlKey($product, $resolved);
-            $product->setUrlKey($urlKey);
+            // Build and save. A url_key collision detected by the URL rewrite storage on save (e.g. in
+            // a store view or with a category/CMS path) is retried once with the SKU suffix, on a
+            // freshly built product (the rolled-back one may hold a stale id and gallery state).
+            $baseWarnings = $warnings;
+            $baseFailedFields = $failedFields;
+            $urlKeyCandidates = $this->resolveUrlKeyCandidates($sku, $resolved);
+            $urlKey = $urlKeyCandidates['key'];
+            $attempt = 0;
+            while (true) {
+                $warnings = $baseWarnings;
+                $failedFields = $baseFailedFields;
+                if ($attempt > 0) {
+                    $warnings[] = 'url_key: collision, suffixed';
+                }
 
-            $this->processIdentifierFields($product, $resolved);
-            $this->processSelectAttributes($product, $resolved, $warnings, $failedFields);
+                $build = $this->buildProduct($resolved, $images, $attributeSetId, $urlKey, $warnings, $failedFields);
+                /** @var \Magento\Catalog\Model\Product $product */
+                $product = $build['product'];
+                $imagesAdded = $build['images_added'];
+                $imagesFailed = $build['images_failed'];
 
-            $warnings = array_merge($warnings, $this->priceUpdater->updatePrices($product, $resolved));
-
-            // Images: base64 entries become data URIs for ImageUpdater (before the save)
-            $creationFailed = 0;
-            if ($images !== null) {
-                $imageFields = $this->creationImages->toResolvedFields(is_array($images) ? $images : [$images]);
-                foreach ($imageFields['warnings'] as $imageWarning) {
-                    $warnings[] = $imageWarning;
-                    if (strpos($imageWarning, 'image #') === 0) {
-                        $creationFailed++;
+                try {
+                    $product->setStoreId(self::ADMIN_STORE_ID);
+                    $this->productResource->save($product);
+                    break;
+                } catch (UrlAlreadyExistsException $e) {
+                    if ($attempt === 0 && $urlKeyCandidates['retry'] !== null) {
+                        $this->generalHelper->addTolog(
+                            'CreateProduct',
+                            "url_key '{$urlKey}' collision on save, retrying suffixed: " . $e->getMessage()
+                        );
+                        $urlKey = $urlKeyCandidates['retry'];
+                        $attempt++;
+                        continue;
                     }
+                    return $this->buildSaveFailedResponse($e, $sku);
+                } catch (\Exception $e) {
+                    return $this->buildSaveFailedResponse($e, $sku);
                 }
-                if ($imageFields['image_link'] !== null) {
-                    $resolved['image_link'] = $imageFields['image_link'];
-                } else {
-                    unset($resolved['image_link']);
-                }
-                if (!empty($imageFields['additional_images'])) {
-                    $resolved['additional_images'] = $imageFields['additional_images'];
-                } else {
-                    unset($resolved['additional_images']);
-                }
-            }
-            if (array_key_exists('image_link', $resolved)
-                && (!is_scalar($resolved['image_link']) || trim((string) $resolved['image_link']) === '')
-            ) {
-                unset($resolved['image_link']);
-            }
-
-            $imagesAdded = 0;
-            $imagesFailed = $creationFailed;
-            if (array_key_exists('image_link', $resolved) || array_key_exists('additional_images', $resolved)) {
-                $imageResult = $this->imageUpdater->updateImages($product, $resolved);
-                $imagesAdded = (int) $imageResult['added'];
-                $imagesFailed += count($imageResult['warnings']);
-                $warnings = array_merge($warnings, $imageResult['warnings']);
-            }
-
-            if (array_key_exists('category_ids', $resolved) || array_key_exists('category', $resolved)) {
-                $warnings = array_merge(
-                    $warnings,
-                    $this->categoryUpdater->updateCategories($product, $resolved, self::ADMIN_STORE_ID)
-                );
-            }
-
-            try {
-                $product->setStoreId(self::ADMIN_STORE_ID);
-                $this->productResource->save($product);
-            } catch (\Exception $e) {
-                $this->generalHelper->addTolog('CreateProduct', $e->getMessage());
-                return $this->buildResponse(
-                    'error',
-                    'Failed to save product: ' . $e->getMessage(),
-                    null,
-                    $sku,
-                    null,
-                    [],
-                    [],
-                    [$e->getMessage()],
-                    null,
-                    500
-                );
             }
 
             $productId = (int) $product->getId();
@@ -504,7 +452,7 @@ class CreateProduct implements CreateProductInterface
                 'error',
                 'Internal error: ' . $e->getMessage(),
                 null,
-                null,
+                $sku,
                 null,
                 [],
                 [],
@@ -513,6 +461,134 @@ class CreateProduct implements CreateProductInterface
                 500
             );
         }
+    }
+
+    /**
+     * New simple product at store 0 with every requested field, images and categories (not saved)
+     *
+     * @param array $resolved
+     * @param mixed $images raw `images` from the request, or null
+     * @param int $attributeSetId
+     * @param string $urlKey
+     * @param array $warnings
+     * @param array $failedFields
+     * @return array ['product' => Product, 'images_added' => int, 'images_failed' => int]
+     */
+    private function buildProduct(
+        array $resolved,
+        $images,
+        int $attributeSetId,
+        string $urlKey,
+        array &$warnings,
+        array &$failedFields
+    ): array {
+        /** @var \Magento\Catalog\Model\Product $product */
+        $product = $this->productFactory->create();
+        $product->setStoreId(self::ADMIN_STORE_ID);
+        $product->setTypeId('simple');
+        $product->setAttributeSetId($attributeSetId);
+        $product->setSku($resolved['sku']);
+        $product->setName($resolved['name']);
+        $product->setPrice((float) $resolved['price']);
+        $product->setStatus($this->normalizeStatus(array_key_exists('status', $resolved) ? $resolved['status'] : 1));
+        $product->setVisibility(
+            array_key_exists('visibility', $resolved)
+                ? (int) $resolved['visibility']
+                : $this->generalHelper->getCreateVisibility()
+        );
+        $product->setWebsiteIds($this->resolveWebsiteIds($resolved, $warnings));
+        $product->setTaxClassId($this->resolveTaxClassId($resolved, $warnings));
+        if (array_key_exists('weight', $resolved)) {
+            $product->setWeight((float) $resolved['weight']);
+        }
+        if (array_key_exists('description', $resolved)) {
+            $product->setDescription($resolved['description']);
+        }
+        if (array_key_exists('short_description', $resolved)) {
+            $product->setShortDescription($resolved['short_description']);
+        }
+        $product->setUrlKey($urlKey);
+
+        $this->processIdentifierFields($product, $resolved);
+        $this->processSelectAttributes($product, $resolved, $warnings, $failedFields);
+
+        $warnings = array_merge($warnings, $this->priceUpdater->updatePrices($product, $resolved));
+
+        // Images: base64 entries become data URIs for ImageUpdater (before the save)
+        $creationFailed = 0;
+        if ($images !== null) {
+            // A single image object (has `content`) instead of a list
+            $imageList = is_array($images) && !array_key_exists('content', $images) ? $images : [$images];
+            $imageFields = $this->creationImages->toResolvedFields($imageList);
+            foreach ($imageFields['warnings'] as $imageWarning) {
+                $warnings[] = $imageWarning;
+                if (strpos($imageWarning, 'image #') === 0) {
+                    $creationFailed++;
+                }
+            }
+            if ($imageFields['image_link'] !== null) {
+                $resolved['image_link'] = $imageFields['image_link'];
+            } else {
+                unset($resolved['image_link']);
+            }
+            if (!empty($imageFields['additional_images'])) {
+                $resolved['additional_images'] = $imageFields['additional_images'];
+            } else {
+                unset($resolved['additional_images']);
+            }
+        }
+        if (array_key_exists('image_link', $resolved)
+            && (!is_scalar($resolved['image_link']) || trim((string) $resolved['image_link']) === '')
+        ) {
+            unset($resolved['image_link']);
+        }
+
+        $imagesAdded = 0;
+        $imagesFailed = $creationFailed;
+        if (array_key_exists('image_link', $resolved) || array_key_exists('additional_images', $resolved)) {
+            $imageResult = $this->imageUpdater->updateImages($product, $resolved);
+            $imagesAdded = (int) $imageResult['added'];
+            $imagesFailed += count($imageResult['warnings']);
+            $warnings = array_merge($warnings, $imageResult['warnings']);
+        }
+
+        if (array_key_exists('category_ids', $resolved) || array_key_exists('category', $resolved)) {
+            $warnings = array_merge(
+                $warnings,
+                $this->categoryUpdater->updateCategories($product, $resolved, self::ADMIN_STORE_ID)
+            );
+        }
+
+        return [
+            'product' => $product,
+            'images_added' => $imagesAdded,
+            'images_failed' => $imagesFailed,
+        ];
+    }
+
+    /**
+     * Error response for a failed save (logged)
+     *
+     * @param \Exception $e
+     * @param string $sku
+     * @return string
+     */
+    private function buildSaveFailedResponse(\Exception $e, string $sku): string
+    {
+        $this->generalHelper->addTolog('CreateProduct', $e->getMessage());
+
+        return $this->buildResponse(
+            'error',
+            'Failed to save product: ' . $e->getMessage(),
+            null,
+            $sku,
+            null,
+            [],
+            [],
+            [$e->getMessage()],
+            null,
+            500
+        );
     }
 
     /**
@@ -575,6 +651,27 @@ class CreateProduct implements CreateProductInterface
     }
 
     /**
+     * Actual SKU of an existing product (a match by EAN may have a different SKU)
+     *
+     * @param int $productId
+     * @param string $fallback
+     * @return string
+     */
+    private function getExistingSku(int $productId, string $fallback): string
+    {
+        try {
+            $value = $this->productResource->getAttributeRawValue($productId, 'sku', self::ADMIN_STORE_ID);
+        } catch (\Exception $e) {
+            return $fallback;
+        }
+        if (is_array($value)) {
+            $value = isset($value['sku']) ? $value['sku'] : null;
+        }
+
+        return is_scalar($value) && (string) $value !== '' ? (string) $value : $fallback;
+    }
+
+    /**
      * Attribute set id from the request (`attribute_set` name or id) or the configured default.
      * Returns null when the set does not exist for catalog_product.
      *
@@ -611,7 +708,8 @@ class CreateProduct implements CreateProductInterface
     }
 
     /**
-     * Website ids from the request or the configured default (then the current website)
+     * Website ids from the request or the configured default, keeping only existing websites;
+     * when none remain, the default store view's website (then the current website)
      *
      * @param array $resolved
      * @param array $warnings
@@ -619,6 +717,8 @@ class CreateProduct implements CreateProductInterface
      */
     private function resolveWebsiteIds(array $resolved, array &$warnings): array
     {
+        $knownIds = $this->getKnownWebsiteIds();
+
         $websiteIds = [];
         if (array_key_exists('website_ids', $resolved)) {
             $raw = $resolved['website_ids'];
@@ -632,15 +732,23 @@ class CreateProduct implements CreateProductInterface
                     $websiteIds[] = (int) $value;
                 }
             }
+            $websiteIds = $this->filterKnownWebsiteIds($websiteIds, $knownIds, $warnings);
         }
 
         if (empty($websiteIds)) {
-            $websiteIds = $this->generalHelper->getCreateWebsiteIds();
+            $websiteIds = $this->filterKnownWebsiteIds(
+                $this->generalHelper->getCreateWebsiteIds(),
+                $knownIds,
+                $warnings
+            );
         }
 
         if (empty($websiteIds)) {
             try {
-                $websiteId = (int) $this->storeManager->getWebsite()->getId();
+                $defaultStore = $this->storeManager->getDefaultStoreView();
+                $websiteId = $defaultStore !== null
+                    ? (int) $defaultStore->getWebsiteId()
+                    : (int) $this->storeManager->getWebsite()->getId();
                 if ($websiteId > 0) {
                     $websiteIds = [$websiteId];
                 }
@@ -654,6 +762,51 @@ class CreateProduct implements CreateProductInterface
         }
 
         return $websiteIds;
+    }
+
+    /**
+     * Ids of the existing websites (admin excluded), or null if they cannot be read
+     *
+     * @return int[]|null
+     */
+    private function getKnownWebsiteIds()
+    {
+        try {
+            $ids = [];
+            foreach ($this->storeManager->getWebsites() as $website) {
+                $ids[] = (int) $website->getId();
+            }
+
+            return $ids;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Drop website ids that do not exist, with a warning for each one
+     *
+     * @param int[] $websiteIds
+     * @param int[]|null $knownIds null = no check
+     * @param array $warnings
+     * @return int[]
+     */
+    private function filterKnownWebsiteIds(array $websiteIds, $knownIds, array &$warnings): array
+    {
+        if ($knownIds === null) {
+            return $websiteIds;
+        }
+
+        $valid = [];
+        foreach ($websiteIds as $websiteId) {
+            if (in_array((int) $websiteId, $knownIds, true)) {
+                $valid[] = (int) $websiteId;
+            } else {
+                $warnings[] = 'website_ids: unknown id ' . (int) $websiteId;
+            }
+        }
+
+        return $valid;
     }
 
     /**
@@ -700,32 +853,36 @@ class CreateProduct implements CreateProductInterface
     }
 
     /**
-     * url_key from the request or the name; if already used at store 0, suffixed with the SKU
+     * url_key from the request or the name; if already used at store 0, suffixed with the SKU.
+     * `retry` is the suffixed key for a collision found only on save (null when the key is
+     * already suffixed or there is no SKU key).
      *
-     * @param \Magento\Catalog\Model\Product $product
+     * @param string $sku
      * @param array $resolved
-     * @return string
+     * @return array ['key' => string, 'retry' => string|null]
      */
-    private function resolveUrlKey($product, array $resolved): string
+    private function resolveUrlKeyCandidates(string $sku, array $resolved): array
     {
         $source = array_key_exists('url_key', $resolved) ? (string) $resolved['url_key'] : (string) $resolved['name'];
         $key = (string) $this->productUrl->formatUrlKey($source);
-        $skuKey = (string) $this->productUrl->formatUrlKey((string) $product->getSku());
+        $skuKey = (string) $this->productUrl->formatUrlKey($sku);
 
         if ($key === '') {
-            return $skuKey;
+            return ['key' => $skuKey, 'retry' => null];
         }
+
+        $suffixed = $skuKey !== '' ? $key . '-' . $skuKey : null;
 
         $collection = $this->productCollectionFactory->create();
         $collection->setStoreId(self::ADMIN_STORE_ID);
         $collection->addAttributeToFilter('url_key', $key);
         $collection->setPageSize(1);
 
-        if ($collection->getSize() > 0 && $skuKey !== '') {
-            return $key . '-' . $skuKey;
+        if ($collection->getSize() > 0 && $suffixed !== null) {
+            return ['key' => $suffixed, 'retry' => null];
         }
 
-        return $key;
+        return ['key' => $key, 'retry' => $suffixed];
     }
 
     /**
