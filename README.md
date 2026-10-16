@@ -286,12 +286,70 @@ bin/magento config:set girofeeds_productapi/general/write_scope all
 bin/magento cache:clean config
 ```
 
+### Reparar valores por vista (girofeeds:scope:repair)
+
+Las versiones anteriores a 1.25.0 guardaban el producto entero en la vista de la ruta REST
+(p. ej. `default`), así que esa vista quedó con un valor propio para casi todos los atributos y
+deja de reflejar lo que se edita en **All Store Views**. Este comando lleva a All Store Views
+(`store_id 0`) los valores propios de una vista y después los elimina de la vista.
+
+```bash
+bin/magento girofeeds:scope:repair --store=default [--dry-run] [--apply] [--exclude=attr1,attr2] [--only=attr1,attr2] [--batch-size=500]
+bin/magento girofeeds:scope:restore --backup=<sufijo>
+```
+
+- Solo atributos de producto de las tablas EAV `varchar`, `text`, `int`, `decimal` y
+  `datetime`, y solo las filas de la vista indicada (`--store` = código o id; `0`, `admin` y
+  `all` se rechazan). No toca galería de imágenes, stock, precios por grupo ni `url_rewrite`.
+- Por producto y atributo: si el valor de la vista difiere del global (o no hay global), pasa a
+  ser el valor global; después se elimina la fila de la vista. Si es igual, solo se elimina.
+- `--exclude`: atributos que **no** se promocionan (All Store Views conserva su valor; la vista
+  solo deja de pisarlo). `--only`: limita la operación a esos atributos.
+- Sin `--apply` es una simulación que no escribe nada.
+- Solo Magento Open Source: en Adobe Commerce con staging (`row_id`) aborta sin hacer nada.
+
+Protocolo:
+
+1. **Copia de seguridad completa de la BD** (en producción, además del respaldo del comando).
+2. Simulación: `bin/magento girofeeds:scope:repair --store=default`. Revisa la tabla (por
+   atributo: filas en la vista, cuántas difieren del global, ámbito) y los ejemplos
+   (id · valor de la vista · valor global). Decide con el cliente qué atributos van en
+   `--exclude`: los que se han editado en All Store Views después del guardado erróneo
+   (p. ej. `is_discontinued`, `availability`, `special_from_date`, `special_to_date`) y los
+   que el aviso marca con ámbito Global.
+3. Aplicar fuera de horario:
+   `bin/magento girofeeds:scope:repair --store=default --exclude=... --apply`.
+   Cada lote de `--batch-size` productos de un atributo es una transacción; si un lote falla se
+   revierte y el comando se detiene. Antes de escribir guarda las filas de la vista que borra,
+   los valores globales que sobrescribe y las filas globales que crea en
+   `girofeeds_scope_backup_<tipo>_<sufijo>` (sufijo = fecha-hora `AAAAMMDDHHMMSS`, que el comando
+   imprime al terminar o al fallar).
+4. Reindexar y limpiar caché:
+
+   ```bash
+   bin/magento indexer:reindex catalog_product_attribute catalog_product_price catalogsearch_fulltext catalog_product_flat
+   bin/magento cache:flush
+   ```
+
+   (`catalog_product_flat` solo si ese indexador existe en la instalación.)
+5. Revisar en la tienda productos de muestra y en la BD que la vista ya no tiene filas propias.
+
+Deshacer: `bin/magento girofeeds:scope:restore --backup=<sufijo>` repone las filas de la vista,
+los valores globales sobrescritos y elimina las filas globales que creó la reparación (los
+cambios hechos en esos valores después de la reparación se pierden). Es idempotente; si se han
+hecho varias reparaciones, restaurar en orden inverso. Después, reindexar y `cache:flush` como
+en el paso 4. Las tablas de respaldo no se borran solas: eliminarlas a mano cuando ya no hagan
+falta.
+
 ## CLI Commands
 
 ```bash
 bin/magento girofeeds:token:generate        # Generate API key
 bin/magento girofeeds:token:generate --force # Regenerate API key
 bin/magento girofeeds:selftest              # Run self-test
+bin/magento girofeeds:scope:repair --store=default          # Report own store view values (dry-run)
+bin/magento girofeeds:scope:repair --store=default --apply  # Promote them to All Store Views (with backup)
+bin/magento girofeeds:scope:restore --backup=<suffix>       # Undo a repair
 ```
 
 ## API Endpoints
