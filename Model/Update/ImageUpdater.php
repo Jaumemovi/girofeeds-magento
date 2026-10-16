@@ -16,6 +16,7 @@ class ImageUpdater
     private const DOWNLOAD_TIMEOUT = 15;
     private const ALLOWED_MIME_TYPES = [
         'image/jpeg' => 'jpg',
+        'image/jpg'  => 'jpg',
         'image/png'  => 'png',
         'image/webp' => 'webp',
         'image/gif'  => 'gif',
