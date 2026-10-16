@@ -60,6 +60,13 @@
                 <validate>validate-digits validate-greater-than-zero</validate>
                 <comment>Maximum number of API requests accepted per minute for each API key. Requests above the limit are rejected with HTTP 429. Default: 600</comment>
             </field>
+            <!-- Default scope only: UpdateProduct reads this path without a store scope. -->
+            <field id="write_scope" translate="label comment" type="select" sortOrder="70" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Write Scope</label>
+                <source_model>Girofeeds\ProductApi\Model\System\Config\Source\WriteScope</source_model>
+                <config_path>girofeeds_productapi/general/write_scope</config_path>
+                <comment><![CDATA[Where product updates from Girofeeds are written. <strong>All Store Views</strong> (store_id 0, recommended) writes the default values whatever the REST route store view is. Choose a store view only to write values specific to that view. A request can still override it with the <code>store</code> parameter or the <code>store_id</code> payload field.]]></comment>
+            </field>
         </group>
         <group id="debug" translate="label" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
             <label>Debug &amp; Logging</label>

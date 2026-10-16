@@ -256,6 +256,27 @@ bin/magento config:set girofeeds_productapi/general/rate_limit 600
 bin/magento cache:clean config
 ```
 
+### Write Scope
+
+**General Settings > General > Write Scope** decides where product updates sent by Girofeeds
+are written (default scope only, path `girofeeds_productapi/general/write_scope`):
+
+- `all` (default, recommended): **All Store Views** (`store_id 0`), whatever store view the
+  REST route uses (`/rest/default/V1/...` no longer writes into the `default` view).
+- a store view code: values are written for that store view only.
+
+A request can override it with the `store` query parameter or a `store_id` field in the payload
+(`all`, `admin` or `0` mean All Store Views; a store code or id means that view; an unknown store
+returns HTTP 400). Only the attributes received are written (`Product\Action::updateAttributes`,
+which respects each attribute's global/website/store scope); the product is not saved as a whole,
+except when the payload carries images. The update response includes `store_id` and
+`scope` (`all` | `store`), and the test endpoint reports `write_scope`.
+
+```bash
+bin/magento config:set girofeeds_productapi/general/write_scope all
+bin/magento cache:clean config
+```
+
 ## CLI Commands
 
 ```bash

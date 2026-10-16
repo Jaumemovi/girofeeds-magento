@@ -32,6 +32,7 @@ class General extends AbstractHelper
     const XPATH_EXTENSION_VERSION = 'girofeeds_productapi/general/version';
     const XPATH_API_KEY = 'girofeeds_productapi/general/api_key';
     const XPATH_USE_ROW_ID = 'girofeeds_productapi/advanced/use_row_id';
+    const XPATH_WRITE_SCOPE = 'girofeeds_productapi/general/write_scope';
 
     /**
      * @var ProductMetadataInterface
@@ -123,6 +124,22 @@ class General extends AbstractHelper
     public function getApiKey()
     {
         return $this->getStoreValue(self::XPATH_API_KEY);
+    }
+
+    /**
+     * Configured write scope for product updates: 'all' (store_id 0) or a store view code
+     *
+     * @return string
+     */
+    public function getWriteScope(): string
+    {
+        $value = trim((string) $this->getStoreValue(
+            self::XPATH_WRITE_SCOPE,
+            null,
+            \Magento\Framework\App\Config\ScopeConfigInterface::SCOPE_TYPE_DEFAULT
+        ));
+
+        return $value === '' ? 'all' : $value;
     }
 
     /**

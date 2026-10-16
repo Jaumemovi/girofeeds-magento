@@ -29,7 +29,7 @@ class ModuleVersion extends Field
     protected function _getElementHtml(AbstractElement $element): string
     {
         $moduleInfo = $this->moduleList->getOne('Girofeeds_ProductApi');
-        $version = $moduleInfo['setup_version'] ?? '1.24.0';
+        $version = $moduleInfo['setup_version'] ?? '1.25.0';
 
         $element->setData('value', $version);
         $element->setReadonly(true);

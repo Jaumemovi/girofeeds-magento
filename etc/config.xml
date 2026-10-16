@@ -9,6 +9,8 @@
                 <add_disabled>0</add_disabled>
                 <stock>1</stock>
                 <rate_limit>600</rate_limit>
+                <write_scope>all</write_scope>
+                <version>1.25.0</version>
             </general>
             <data>
                 <name_attribute>name</name_attribute>

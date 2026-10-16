@@ -131,6 +131,8 @@ class Test implements TestInterface
                 'module_name' => 'Girofeeds_ProductApi',
                 'supported_fields' => $this->getSupportedFields(),
                 'extra_mapped_fields' => $extraMappedFields,
+                'write_scope' => $this->generalHelper->getWriteScope(),
+                'write_scope_capability' => true,
             ];
 
             return json_encode($response);
