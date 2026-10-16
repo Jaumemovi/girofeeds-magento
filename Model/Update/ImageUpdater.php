@@ -48,56 +48,124 @@ class ImageUpdater
     /**
      * Update product images
      *
+     * Images already in the gallery (same source) are skipped, so the caller only needs to save
+     * the product when 'added' > 0.
+     *
      * @param ProductInterface $product
      * @param array $resolvedData
-     * @return array
+     * @return array ['warnings' => string[], 'added' => int]
      */
     public function updateImages(ProductInterface $product, array $resolvedData)
     {
         $warnings = [];
+        $added = 0;
+        $existingFiles = $this->getExistingGalleryFiles($product);
 
         if (array_key_exists('image_link', $resolvedData)) {
             $imageUrl = $resolvedData['image_link'];
-            $warning = $this->processImage($product, (string) $imageUrl, true);
-            if ($warning) {
-                $warnings[] = $warning;
+            $result = $this->processImage($product, (string) $imageUrl, true, $existingFiles);
+            if ($result === true) {
+                $added++;
+            } elseif (is_string($result)) {
+                $warnings[] = $result;
             }
         }
 
         if (array_key_exists('additional_images', $resolvedData) && is_array($resolvedData['additional_images'])) {
             foreach ($resolvedData['additional_images'] as $imageUrl) {
-                $warning = $this->processImage($product, (string) $imageUrl, false);
-                if ($warning) {
-                    $warnings[] = $warning;
+                $result = $this->processImage($product, (string) $imageUrl, false, $existingFiles);
+                if ($result === true) {
+                    $added++;
+                } elseif (is_string($result)) {
+                    $warnings[] = $result;
                 }
             }
         }
 
-        return $warnings;
+        return ['warnings' => $warnings, 'added' => $added];
+    }
+
+    /**
+     * Base file names (without extension) of the images already in the product gallery
+     *
+     * @param ProductInterface $product
+     * @return array
+     */
+    private function getExistingGalleryFiles(ProductInterface $product)
+    {
+        $files = [];
+        $gallery = $product->getData('media_gallery');
+        if (!is_array($gallery) || empty($gallery['images']) || !is_array($gallery['images'])) {
+            return $files;
+        }
+
+        foreach ($gallery['images'] as $image) {
+            if (empty($image['file']) || !empty($image['removed'])) {
+                continue;
+            }
+            $files[] = strtolower(pathinfo((string) $image['file'], PATHINFO_FILENAME));
+        }
+
+        return $files;
+    }
+
+    /**
+     * Whether an image with this base name (or a Magento "_N" copy of it) is in the gallery
+     *
+     * @param string $baseName
+     * @param array $existingFiles
+     * @return bool
+     */
+    private function isInGallery($baseName, array $existingFiles)
+    {
+        $baseName = strtolower($baseName);
+        foreach ($existingFiles as $file) {
+            if ($file === $baseName || preg_match('/^' . preg_quote($baseName, '/') . '_\d+$/', $file)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
      * Process single image
      *
+     * The file is named after a hash of its source (girofeeds_{md5}), so re-sending the same
+     * URL or data finds it in the gallery and is skipped.
+     *
      * @param ProductInterface $product
      * @param string $imageSource
      * @param bool $isMain
-     * @return string|null
+     * @param array $existingFiles gallery base names; images added here are appended
+     * @return bool|string true when added, false when skipped (already present), warning otherwise
      */
-    private function processImage(ProductInterface $product, $imageSource, $isMain)
+    private function processImage(ProductInterface $product, $imageSource, $isMain, array &$existingFiles)
     {
         try {
             $storeMediaUrl = $this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_MEDIA);
             if (strpos($imageSource, $storeMediaUrl) === 0) {
-                return null;
+                return false;
+            }
+
+            $sourceBaseName = strtolower(pathinfo((string) parse_url($imageSource, PHP_URL_PATH), PATHINFO_FILENAME));
+            if (strpos($imageSource, 'data:') !== 0 && $sourceBaseName !== ''
+                && $this->isInGallery($sourceBaseName, $existingFiles)
+            ) {
+                return false;
+            }
+
+            $baseName = 'girofeeds_' . md5($imageSource);
+            if ($this->isInGallery($baseName, $existingFiles)) {
+                return false;
             }
 
             $tmpFilePath = null;
 
             if (strpos($imageSource, 'data:') === 0) {
-                $tmpFilePath = $this->decodeBase64Image($imageSource);
+                $tmpFilePath = $this->decodeBase64Image($imageSource, $baseName);
             } elseif (filter_var($imageSource, FILTER_VALIDATE_URL)) {
-                $tmpFilePath = $this->downloadImage($imageSource);
+                $tmpFilePath = $this->downloadImage($imageSource, $baseName);
             } else {
                 return "Invalid image source: not a valid URL or base64 data";
             }
@@ -109,23 +177,40 @@ class ImageUpdater
             $product->addImageToMediaGallery(
                 $tmpFilePath,
                 $isMain ? ['image', 'small_image', 'thumbnail'] : null,
-                false,
+                true,
                 false
             );
+            $existingFiles[] = $baseName;
 
-            return null;
+            return true;
         } catch (\Exception $e) {
             return "Image error: " . $e->getMessage();
         }
     }
 
     /**
+     * Temporary file path under pub/media (Gallery\Processor::addImage resolves files there)
+     *
+     * @param string $baseName
+     * @param string $extension
+     * @return string
+     */
+    private function getTmpFilePath($baseName, $extension)
+    {
+        $mediaDirectory = $this->filesystem->getDirectoryWrite(DirectoryList::MEDIA);
+        $mediaDirectory->create('tmp/girofeeds');
+
+        return $mediaDirectory->getAbsolutePath('tmp/girofeeds/' . $baseName . '.' . $extension);
+    }
+
+    /**
      * Decode base64 image
      *
      * @param string $dataUrl
+     * @param string $baseName
      * @return string|null
      */
-    private function decodeBase64Image($dataUrl)
+    private function decodeBase64Image($dataUrl, $baseName)
     {
         if (!preg_match('/^data:image\/(\w+);base64,(.+)$/', $dataUrl, $matches)) {
             return null;
@@ -144,8 +229,7 @@ class ImageUpdater
             return null;
         }
 
-        $tmpDir = $this->filesystem->getDirectoryRead(DirectoryList::TMP)->getAbsolutePath();
-        $tmpFile = $tmpDir . 'girofeeds_' . uniqid() . '.' . $extension;
+        $tmpFile = $this->getTmpFilePath($baseName, $extension);
         file_put_contents($tmpFile, $imageData);
 
         return $tmpFile;
@@ -155,9 +239,10 @@ class ImageUpdater
      * Download image from URL
      *
      * @param string $url
+     * @param string $baseName
      * @return string|null
      */
-    private function downloadImage($url)
+    private function downloadImage($url, $baseName)
     {
         try {
             $ch = curl_init($url);
@@ -186,8 +271,7 @@ class ImageUpdater
             $contentType = strtolower(trim(explode(';', (string) $contentType)[0]));
             $extension = self::ALLOWED_MIME_TYPES[$contentType] ?? 'jpg';
 
-            $tmpDir = $this->filesystem->getDirectoryRead(DirectoryList::TMP)->getAbsolutePath();
-            $tmpFile = $tmpDir . 'girofeeds_' . uniqid() . '.' . $extension;
+            $tmpFile = $this->getTmpFilePath($baseName, $extension);
             file_put_contents($tmpFile, $imageData);
 
             return $tmpFile;

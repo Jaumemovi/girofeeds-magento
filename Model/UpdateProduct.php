@@ -15,14 +15,16 @@ use Girofeeds\ProductApi\Model\Update\PriceUpdater;
 use Girofeeds\ProductApi\Model\Update\StockUpdater;
 use Girofeeds\ProductApi\Model\Update\ValidationService;
 use Magento\Catalog\Api\ProductRepositoryInterface;
-use Magento\Catalog\Model\Indexer\Product\Category as CategoryProductIndexer;
+use Magento\Catalog\Model\Indexer\Product\Eav\Processor as EavIndexerProcessor;
+use Magento\Catalog\Model\Indexer\Product\Flat\Processor as FlatIndexerProcessor;
+use Magento\Catalog\Model\Indexer\Product\Price\Processor as PriceIndexerProcessor;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\Product\Action as ProductAction;
-use Magento\Catalog\Model\Product\CategoryLink;
+use Magento\Catalog\Model\Product\Url as ProductUrl;
 use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
+use Magento\CatalogSearch\Model\Indexer\Fulltext\Processor as FulltextIndexerProcessor;
 use Magento\Eav\Model\Config as EavConfig;
 use Magento\Framework\App\RequestInterface;
-use Magento\Framework\Indexer\IndexerRegistry;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Webapi\Rest\Response as RestResponse;
@@ -120,14 +122,29 @@ class UpdateProduct implements UpdateProductInterface
     private $eavConfig;
 
     /**
-     * @var CategoryLink
+     * @var ProductUrl
      */
-    private $categoryLink;
+    private $productUrl;
 
     /**
-     * @var IndexerRegistry
+     * @var PriceIndexerProcessor
      */
-    private $indexerRegistry;
+    private $priceIndexerProcessor;
+
+    /**
+     * @var EavIndexerProcessor
+     */
+    private $eavIndexerProcessor;
+
+    /**
+     * @var FlatIndexerProcessor
+     */
+    private $flatIndexerProcessor;
+
+    /**
+     * @var FulltextIndexerProcessor
+     */
+    private $fulltextIndexerProcessor;
 
     /**
      * Constructor
@@ -150,8 +167,11 @@ class UpdateProduct implements UpdateProductInterface
      * @param ProductAction $productAction
      * @param ProductResource $productResource
      * @param EavConfig $eavConfig
-     * @param CategoryLink $categoryLink
-     * @param IndexerRegistry $indexerRegistry
+     * @param ProductUrl $productUrl
+     * @param PriceIndexerProcessor $priceIndexerProcessor
+     * @param EavIndexerProcessor $eavIndexerProcessor
+     * @param FlatIndexerProcessor $flatIndexerProcessor
+     * @param FulltextIndexerProcessor $fulltextIndexerProcessor
      */
     public function __construct(
         RequestInterface $request,
@@ -172,8 +192,11 @@ class UpdateProduct implements UpdateProductInterface
         ProductAction $productAction,
         ProductResource $productResource,
         EavConfig $eavConfig,
-        CategoryLink $categoryLink,
-        IndexerRegistry $indexerRegistry
+        ProductUrl $productUrl,
+        PriceIndexerProcessor $priceIndexerProcessor,
+        EavIndexerProcessor $eavIndexerProcessor,
+        FlatIndexerProcessor $flatIndexerProcessor,
+        FulltextIndexerProcessor $fulltextIndexerProcessor
     ) {
         $this->request = $request;
         $this->productRepository = $productRepository;
@@ -193,8 +216,11 @@ class UpdateProduct implements UpdateProductInterface
         $this->productAction = $productAction;
         $this->productResource = $productResource;
         $this->eavConfig = $eavConfig;
-        $this->categoryLink = $categoryLink;
-        $this->indexerRegistry = $indexerRegistry;
+        $this->productUrl = $productUrl;
+        $this->priceIndexerProcessor = $priceIndexerProcessor;
+        $this->eavIndexerProcessor = $eavIndexerProcessor;
+        $this->flatIndexerProcessor = $flatIndexerProcessor;
+        $this->fulltextIndexerProcessor = $fulltextIndexerProcessor;
     }
 
     /**
@@ -277,6 +303,9 @@ class UpdateProduct implements UpdateProductInterface
             $product->setStoreId($storeId);
 
             $resolved = $this->fieldProcessor->resolveFields($data);
+            if (array_key_exists('url_key', $resolved)) {
+                $resolved['url_key'] = $this->productUrl->formatUrlKey((string) $resolved['url_key']);
+            }
 
             $validationErrors = $this->validationService->validate($resolved);
             if (!empty($validationErrors)) {
@@ -318,17 +347,45 @@ class UpdateProduct implements UpdateProductInterface
                 $touchedAttributes['special_from_date'] = 'special_price';
             }
 
-            // Persist only the touched attributes at $storeId (no full product save)
+            $hasCategories = array_key_exists('category_ids', $resolved) || array_key_exists('category', $resolved);
+            if ($hasCategories) {
+                $categoryWarnings = $this->categoryUpdater->updateCategories($product, $resolved, $storeId);
+                $warnings = array_merge($warnings, $categoryWarnings);
+                $updatedFields[] = array_key_exists('category_ids', $resolved) ? 'category_ids' : 'category';
+            }
+
+            $imagesAdded = 0;
+            if (array_key_exists('image_link', $resolved) || array_key_exists('additional_images', $resolved)) {
+                $imageResult = $this->imageUpdater->updateImages($product, $resolved);
+                $warnings = array_merge($warnings, $imageResult['warnings']);
+                $imagesAdded = (int) $imageResult['added'];
+                if (array_key_exists('image_link', $resolved)) {
+                    $updatedFields[] = 'image_link';
+                }
+                if (array_key_exists('additional_images', $resolved)) {
+                    $updatedFields[] = 'additional_images';
+                }
+            }
+
+            // Full save only when Magento's save observers are needed: url_key (format, uniqueness,
+            // URL rewrites), categories (links + category URL rewrites) or newly added images
+            $savedFull = array_key_exists('url_key', $resolved) || $hasCategories || $imagesAdded > 0;
+
             try {
-                $this->saveAttributes(
+                $attributeData = $this->collectAttributeData(
                     $product,
                     $productId,
-                    $storeId,
                     $touchedAttributes,
                     $updatedFields,
                     $warnings,
                     $failedFields
                 );
+
+                if ($savedFull) {
+                    $this->saveFullProduct($product, $storeId, $hasCategories);
+                } else {
+                    $this->saveAttributes($product, $productId, $storeId, $attributeData);
+                }
             } catch (\Exception $e) {
                 return $this->buildResponse(
                     'error',
@@ -350,29 +407,9 @@ class UpdateProduct implements UpdateProductInterface
                 }
             }
 
-            $categoryWarnings = $this->categoryUpdater->updateCategories($product, $resolved);
-            $warnings = array_merge($warnings, $categoryWarnings);
-            if (array_key_exists('category_ids', $resolved) || array_key_exists('category', $resolved)) {
-                $this->saveCategoryLinks($product, $warnings);
-                $updatedFields[] = array_key_exists('category_ids', $resolved) ? 'category_ids' : 'category';
-            }
-
-            // Images need a product save (media gallery); only when the payload carries images
-            if (array_key_exists('image_link', $resolved) || array_key_exists('additional_images', $resolved)) {
-                $imageWarnings = $this->imageUpdater->updateImages($product, $resolved);
-                $warnings = array_merge($warnings, $imageWarnings);
-                try {
-                    $product->setStoreId($storeId);
-                    $this->productResource->save($product);
-                } catch (\Exception $e) {
-                    $warnings[] = "Image save failed: " . $e->getMessage();
-                }
-                if (array_key_exists('image_link', $resolved)) {
-                    $updatedFields[] = 'image_link';
-                }
-                if (array_key_exists('additional_images', $resolved)) {
-                    $updatedFields[] = 'additional_images';
-                }
+            // The full save reindexes by itself; the attribute-only path does not
+            if (!$savedFull && (!empty($attributeData['eav']) || !empty($attributeData['static']))) {
+                $this->reindexProduct($productId, $warnings);
             }
 
             $updatedFields = array_values(array_unique($updatedFields));
@@ -387,7 +424,8 @@ class UpdateProduct implements UpdateProductInterface
                     $productId,
                     [],
                     200,
-                    $storeId
+                    $storeId,
+                    $savedFull
                 );
             }
 
@@ -400,7 +438,8 @@ class UpdateProduct implements UpdateProductInterface
                 $productId,
                 [],
                 200,
-                $storeId
+                $storeId,
+                $savedFull
             );
         } catch (\Exception $e) {
             $this->generalHelper->addTolog('UpdateProduct', $e->getMessage());
@@ -506,7 +545,8 @@ class UpdateProduct implements UpdateProductInterface
                 $warning = $this->attributeUpdater->updateSelectAttribute(
                     $product,
                     $magentoAttribute,
-                    (string) $resolved[$requestField]
+                    (string) $resolved[$requestField],
+                    (int) $product->getStoreId()
                 );
                 if ($warning) {
                     $warnings[] = "Field '{$requestField}': {$warning}";
@@ -667,33 +707,29 @@ class UpdateProduct implements UpdateProductInterface
     }
 
     /**
-     * Write only the touched attributes at the given store id.
+     * Split the touched attributes into EAV and static (entity table) values.
      *
-     * EAV attributes go through Product\Action::updateAttributes (respects each attribute's
-     * global/website/store scope and leaves the other attributes untouched). Static attributes
-     * (sku) live in the entity table and are written there.
+     * Unknown attribute codes are reported as failed fields. A duplicate SKU throws before anything
+     * is written, as the full save did.
      *
      * @param \Magento\Catalog\Api\Data\ProductInterface $product
      * @param int $productId
-     * @param int $storeId
      * @param array $touchedAttributes
      * @param array $updatedFields
      * @param array $warnings
      * @param array $failedFields
-     * @return void
-     * @throws \Exception
+     * @return array ['eav' => code => value, 'static' => code => value]
+     * @throws LocalizedException
      */
-    private function saveAttributes(
+    private function collectAttributeData(
         $product,
         int $productId,
-        int $storeId,
         array $touchedAttributes,
         array &$updatedFields,
         array &$warnings,
         array &$failedFields
-    ) {
-        $attributeData = [];
-        $staticData = [];
+    ): array {
+        $attributeData = ['eav' => [], 'static' => []];
 
         foreach ($touchedAttributes as $code => $field) {
             $attribute = $this->eavConfig->getAttribute(Product::ENTITY, $code);
@@ -709,76 +745,102 @@ class UpdateProduct implements UpdateProductInterface
                 $value = implode(',', $value);
             }
 
-            if ($attribute->isStatic()) {
-                $staticData[$code] = $value;
-            } else {
-                $attributeData[$code] = $value;
-            }
+            $attributeData[$attribute->isStatic() ? 'static' : 'eav'][$code] = $value;
         }
 
-        // Checked before any write: a duplicate SKU fails the whole update, as the full save did
-        if (array_key_exists('sku', $staticData)) {
-            $existingId = $this->productResource->getIdBySku($staticData['sku']);
+        if (array_key_exists('sku', $attributeData['static'])) {
+            $sku = $attributeData['static']['sku'];
+            $existingId = $this->productResource->getIdBySku($sku);
             if ($existingId && (int) $existingId !== $productId) {
-                throw new LocalizedException(
-                    __("SKU '%1' is already used by product %2", $staticData['sku'], $existingId)
-                );
+                throw new LocalizedException(__("SKU '%1' is already used by product %2", $sku, $existingId));
             }
         }
 
-        if (!empty($staticData)) {
+        return $attributeData;
+    }
+
+    /**
+     * Write only the touched attributes at the given store id (no product save).
+     *
+     * EAV attributes go through Product\Action::updateAttributes (respects each attribute's
+     * global/website/store scope and leaves the other attributes untouched). Static attributes
+     * (sku) live in the entity table and are written there.
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param int $productId
+     * @param int $storeId
+     * @param array $attributeData from collectAttributeData()
+     * @return void
+     * @throws \Exception
+     */
+    private function saveAttributes($product, int $productId, int $storeId, array $attributeData)
+    {
+        if (!empty($attributeData['static'])) {
             $linkField = $this->productResource->getLinkField();
             $this->productResource->getConnection()->update(
                 $this->productResource->getEntityTable(),
-                $staticData,
+                $attributeData['static'],
                 [$linkField . ' = ?' => $product->getData($linkField)]
             );
         }
 
-        if (!empty($attributeData)) {
-            $this->productAction->updateAttributes([$productId], $attributeData, $storeId);
+        if (!empty($attributeData['eav'])) {
+            $this->productAction->updateAttributes([$productId], $attributeData['eav'], $storeId);
         }
     }
 
     /**
-     * Persist the product's category ids as category links (global, no product save)
+     * Full product save with the resource model at the resolved store id.
+     *
+     * The resource model keeps the product's store id (ProductRepository::save would force the
+     * request's store view) and runs the save observers: url_key formatting/uniqueness, URL
+     * rewrites, category links and media gallery. A duplicate url_key throws.
      *
      * @param \Magento\Catalog\Api\Data\ProductInterface $product
-     * @param array $warnings
+     * @param int $storeId
+     * @param bool $hasCategories
      * @return void
+     * @throws \Exception
      */
-    private function saveCategoryLinks($product, array &$warnings)
+    private function saveFullProduct($product, int $storeId, bool $hasCategories)
     {
-        try {
-            $categoryIds = array_map('intval', (array) $product->getCategoryIds());
-
-            $positions = [];
-            foreach ($this->categoryLink->getCategoryLinks($product, $categoryIds) as $link) {
-                $positions[(int) $link['category_id']] = (int) $link['position'];
-            }
-
-            $links = [];
-            foreach ($categoryIds as $categoryId) {
-                $links[] = [
-                    'category_id' => $categoryId,
-                    'position' => $positions[$categoryId] ?? 0,
-                ];
-            }
-
-            $this->categoryLink->saveCategoryLinks($product, $links);
-            // The links loaded with the product are stale now; a later product save (images)
-            // must not merge them back in
+        if ($hasCategories) {
+            // The links loaded with the product are stale; the save handler must use category_ids
             $extensionAttributes = $product->getExtensionAttributes();
             if ($extensionAttributes && method_exists($extensionAttributes, 'setCategoryLinks')) {
                 $extensionAttributes->setCategoryLinks(null);
             }
+        }
 
-            $indexer = $this->indexerRegistry->get(CategoryProductIndexer::INDEXER_ID);
-            if (!$indexer->isScheduled()) {
-                $indexer->reindexRow((int) $product->getId());
+        $product->setStoreId($storeId);
+        $this->productResource->save($product);
+    }
+
+    /**
+     * Reindex one product after an attribute-only write (price, EAV, flat, fulltext), skipping
+     * indexers in "Update by Schedule" mode. Failures become warnings.
+     *
+     * @param int $productId
+     * @param array $warnings
+     * @return void
+     */
+    private function reindexProduct(int $productId, array &$warnings)
+    {
+        $processors = [
+            'price' => $this->priceIndexerProcessor,
+            'eav' => $this->eavIndexerProcessor,
+            'flat' => $this->flatIndexerProcessor,
+            'fulltext' => $this->fulltextIndexerProcessor,
+        ];
+
+        foreach ($processors as $name => $processor) {
+            try {
+                if (!$processor->isIndexerScheduled()) {
+                    $processor->reindexRow($productId);
+                }
+            } catch (\Exception $e) {
+                $warnings[] = "Reindex ({$name}) failed: " . $e->getMessage();
             }
-        } catch (\Exception $e) {
-            $warnings[] = "Category save failed: " . $e->getMessage();
         }
     }
 
@@ -794,6 +856,7 @@ class UpdateProduct implements UpdateProductInterface
      * @param array $errors
      * @param int $httpCode
      * @param int|null $storeId effective write store id (success responses)
+     * @param bool|null $savedFull whether the product was saved as a whole (success responses)
      * @return string
      */
     private function buildResponse(
@@ -805,7 +868,8 @@ class UpdateProduct implements UpdateProductInterface
         $productId = null,
         array $errors = [],
         int $httpCode = 200,
-        $storeId = null
+        $storeId = null,
+        $savedFull = null
     ) {
         $this->restResponse->setHttpResponseCode($httpCode);
 
@@ -824,6 +888,9 @@ class UpdateProduct implements UpdateProductInterface
             if ($storeId !== null) {
                 $response['store_id'] = (int) $storeId;
                 $response['scope'] = (int) $storeId === 0 ? 'all' : 'store';
+            }
+            if ($savedFull !== null) {
+                $response['saved_full'] = (bool) $savedFull;
             }
         } else {
             $response['errors'] = $errors;

@@ -30,12 +30,14 @@ class AttributeUpdater
      * @param ProductInterface $product
      * @param string $attributeCode
      * @param string $textValue
+     * @param int $storeId write store id; labels are matched in admin (0) first, then in this store
      * @return string|null
      */
     public function updateSelectAttribute(
         ProductInterface $product,
         $attributeCode,
-        $textValue
+        $textValue,
+        $storeId = 0
     ) {
         $attribute = $this->eavConfig->getAttribute('catalog_product', $attributeCode);
 
@@ -48,22 +50,30 @@ class AttributeUpdater
             return null;
         }
 
-        $options = $attribute->getSource()->getAllOptions(false);
         $optionId = null;
+        $availableLabels = [];
+        $previousStoreId = $attribute->getStoreId();
 
-        foreach ($options as $option) {
-            if (strtolower(trim((string) $option['label'])) === strtolower(trim($textValue))) {
-                $optionId = $option['value'];
-                break;
+        try {
+            foreach (array_unique([0, (int) $storeId]) as $labelStoreId) {
+                // The option source reads labels for the attribute's store id
+                $attribute->setStoreId($labelStoreId);
+                foreach ($attribute->getSource()->getAllOptions(false) as $option) {
+                    $label = (string) $option['label'];
+                    if (strtolower(trim($label)) === strtolower(trim($textValue))) {
+                        $optionId = $option['value'];
+                        break 2;
+                    }
+                    $availableLabels[] = $label;
+                }
             }
+        } finally {
+            $attribute->setStoreId($previousStoreId);
         }
 
         if ($optionId === null) {
-            $availableLabels = array_map(function ($o) {
-                return $o['label'];
-            }, $options);
             return "Value '{$textValue}' is not a valid option for attribute '{$attributeCode}'. "
-                . "Available options: " . implode(', ', $availableLabels);
+                . "Available options: " . implode(', ', array_unique($availableLabels));
         }
 
         $product->setData($attributeCode, $optionId);

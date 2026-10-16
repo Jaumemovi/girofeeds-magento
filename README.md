@@ -267,10 +267,19 @@ are written (default scope only, path `girofeeds_productapi/general/write_scope`
 
 A request can override it with the `store` query parameter or a `store_id` field in the payload
 (`all`, `admin` or `0` mean All Store Views; a store code or id means that view; an unknown store
-returns HTTP 400). Only the attributes received are written (`Product\Action::updateAttributes`,
-which respects each attribute's global/website/store scope); the product is not saved as a whole,
-except when the payload carries images. The update response includes `store_id` and
-`scope` (`all` | `store`), and the test endpoint reports `write_scope`.
+returns HTTP 400). By default only the attributes received are written
+(`Product\Action::updateAttributes`, which respects each attribute's global/website/store scope),
+followed by a reindex of that product (price, EAV, flat, fulltext) for the indexers that are not
+in "Update by Schedule" mode. The product is saved as a whole, at the resolved store id, only
+when the payload carries `url_key` (formatted, checked for uniqueness, URL rewrites regenerated),
+categories (`category_ids` / `category`), or images that are not already in the gallery. Select
+option labels and category names are matched in the admin store first, then in the resolved
+store view. The update response includes `store_id`, `scope` (`all` | `store`) and
+`saved_full` (`true` | `false`); the test endpoint reports `write_scope`.
+
+> **Nota (Magento 2.3):** cada escritura con `updateAttributes` limpia la etiqueta de caché
+> genérica del catálogo (`cat_p`), así que las sincronizaciones masivas invalidan la FPC del
+> catálogo en Magento 2.3. Usar la cola de indexación "Update by Schedule" y Varnish.
 
 ```bash
 bin/magento config:set girofeeds_productapi/general/write_scope all
@@ -306,5 +315,5 @@ bin/magento girofeeds:selftest              # Run self-test
 
 ## Compatibility
 
-- PHP >= 8.1
-- Magento 2.4.x
+- PHP >= 7.1.3
+- Magento 2.3.x / 2.4.x
