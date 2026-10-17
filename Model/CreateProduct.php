@@ -552,10 +552,27 @@ class CreateProduct implements CreateProductInterface
             $warnings = array_merge($warnings, $imageResult['warnings']);
         }
 
-        if (array_key_exists('category_ids', $resolved) || array_key_exists('category', $resolved)) {
+        // Categories: `category_ids` (normalized to ints) replace, then a `category` path appends.
+        // CategoryUpdater handles only one of the two per call, so each goes in its own call.
+        if (array_key_exists('category_ids', $resolved)) {
+            $categoryIds = $this->normalizeCategoryIds($resolved['category_ids'], $warnings);
             $warnings = array_merge(
                 $warnings,
-                $this->categoryUpdater->updateCategories($product, $resolved, self::ADMIN_STORE_ID)
+                $this->categoryUpdater->updateCategories(
+                    $product,
+                    ['category_ids' => $categoryIds],
+                    self::ADMIN_STORE_ID
+                )
+            );
+        }
+        if (array_key_exists('category', $resolved)) {
+            $warnings = array_merge(
+                $warnings,
+                $this->categoryUpdater->updateCategories(
+                    $product,
+                    ['category' => $resolved['category']],
+                    self::ADMIN_STORE_ID
+                )
             );
         }
 
@@ -564,6 +581,48 @@ class CreateProduct implements CreateProductInterface
             'images_added' => $imagesAdded,
             'images_failed' => $imagesFailed,
         ];
+    }
+
+    /**
+     * Normalize `category_ids` to a list of ints
+     *
+     * Accepts a list, a single scalar (12) or a comma-separated string ("12,15"). Empty entries
+     * are dropped; non-numeric ones are skipped with a warning.
+     *
+     * @param mixed $raw
+     * @param array $warnings
+     * @return int[]
+     */
+    private function normalizeCategoryIds($raw, array &$warnings): array
+    {
+        if (is_array($raw)) {
+            $entries = $raw;
+        } elseif (is_string($raw)) {
+            $entries = explode(',', $raw);
+        } elseif (is_scalar($raw)) {
+            $entries = [$raw];
+        } else {
+            $entries = [];
+        }
+
+        $categoryIds = [];
+        foreach ($entries as $entry) {
+            if (!is_scalar($entry) || is_bool($entry)) {
+                $warnings[] = 'category_ids: invalid entry';
+                continue;
+            }
+            $entry = trim((string) $entry);
+            if ($entry === '') {
+                continue;
+            }
+            if (!ctype_digit($entry) || (int) $entry <= 0) {
+                $warnings[] = "category_ids: invalid id '{$entry}'";
+                continue;
+            }
+            $categoryIds[] = (int) $entry;
+        }
+
+        return array_values(array_unique($categoryIds));
     }
 
     /**

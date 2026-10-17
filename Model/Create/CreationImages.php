@@ -12,13 +12,17 @@ class CreationImages
 {
     const MAX_IMAGES = 10;
     const MAX_DECODED_SIZE = 10485760;
-    const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    /** Mime types detected from the decoded bytes that Magento 2.3 accepts (jpg/jpeg/png/gif) */
+    const ALLOWED_DETECTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
 
     /**
      * Build the image fields for ImageUpdater
      *
      * The first valid image becomes 'image_link' (image/small_image/thumbnail), the rest go to
-     * 'additional_images' in order. Invalid entries are skipped with a warning.
+     * 'additional_images' in order. Invalid entries are skipped with a warning. The decoded bytes
+     * must be a real JPEG, PNG or GIF image; WebP is rejected because Magento 2.3 does not accept
+     * the extension (the Girofeeds server converts WebP to JPEG before sending).
      *
      * @param array $images [{filename, mimeType, content}]
      * @return array ['image_link' => string|null, 'additional_images' => string[], 'warnings' => string[]]
@@ -45,6 +49,10 @@ class CreationImages
             $mimeType = isset($image['mimeType']) && is_string($image['mimeType'])
                 ? strtolower(trim($image['mimeType']))
                 : '';
+            if ($mimeType === 'image/webp') {
+                $warnings[] = 'image #' . $position . ': webp not supported by Magento 2.3';
+                continue;
+            }
             if (!in_array($mimeType, self::ALLOWED_MIME_TYPES, true)) {
                 $warnings[] = 'image #' . $position . ': unsupported mimeType';
                 continue;
@@ -58,7 +66,7 @@ class CreationImages
             // ImageUpdater matches the data URI on a single line, so whitespace is dropped
             $content = preg_replace('/\s+/', '', $image['content']);
             $decoded = $content === '' ? false : base64_decode($content, true);
-            if ($decoded === false || $decoded === '') {
+            if ($decoded === false) {
                 $warnings[] = 'image #' . $position . ': invalid base64 content';
                 continue;
             }
@@ -68,7 +76,23 @@ class CreationImages
                 continue;
             }
 
-            $dataUris[] = 'data:' . $mimeType . ';base64,' . $content;
+            // '@': getimagesizefromstring() emits a notice on non-image data, which Magento turns
+            // into an exception in developer mode
+            $imageInfo = @getimagesizefromstring($decoded);
+            $detectedMimeType = is_array($imageInfo) && isset($imageInfo['mime'])
+                ? strtolower((string) $imageInfo['mime'])
+                : '';
+            if ($detectedMimeType === 'image/webp') {
+                $warnings[] = 'image #' . $position . ': webp not supported by Magento 2.3';
+                continue;
+            }
+            if (!in_array($detectedMimeType, self::ALLOWED_DETECTED_MIME_TYPES, true)) {
+                $warnings[] = 'image #' . $position . ': not an image';
+                continue;
+            }
+
+            // The detected mime type wins over the declared one so the file extension matches
+            $dataUris[] = 'data:' . $detectedMimeType . ';base64,' . $content;
         }
 
         return [
