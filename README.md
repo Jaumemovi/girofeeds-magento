@@ -417,22 +417,31 @@ Response (HTTP 200):
   store 0, it is suffixed with `-<sku>`. If the save still hits a URL rewrite collision (another
   store view, a category or CMS path), the product is rebuilt and saved once more with the
   suffix, with the warning `url_key: collision, suffixed`.
-- Categories: `category_ids` or `category` paths (`A > B`), like `updateproduct`. A path that
-  does not exist is skipped with a warning; the product is still created.
+- Categories: `category_ids` and/or a `category` path (`A > B`). `category_ids` accepts a list,
+  a single id (`12`) or a comma-separated string (`"12,15"`); non-numeric entries and unknown ids
+  are skipped with a warning. When both come, both apply: `category_ids` first, then the
+  `category` path is added. A path that does not exist is skipped with a warning; the product is
+  still created.
 - Stock: `qty` (default 0) and `manage_stock` (default 1); `is_in_stock` follows `qty > 0`.
 - After the save the product row is reindexed (price, EAV, flat, fulltext) for the indexers that
   are not in "Update by Schedule" mode.
 
-HTTP codes: 400 invalid JSON, 401/403 API key, 422 validation (`missing: sku|name|price`,
-`price` ≤ 0, `attribute set not found`), 429 rate limit, 500 save or internal error.
+HTTP codes (REST route `POST /rest/all/V1/girofeeds/createproduct`): 400 invalid JSON,
+401/403 API key, 422 validation (`missing: sku|name|price`, `price` ≤ 0,
+`attribute set not found`), 429 rate limit, 500 save or internal error. The frontend route
+`/girofeeds/createproduct/index` always answers HTTP 200, like `updateproduct`; read `status`
+(and `errors`) in the JSON body.
 
 **Limits**
 
 - `images`: list of `{filename, mimeType, content}` with base64 `content`; a single object is
   also accepted. At most **10** images (the rest are skipped with a warning), **10 MB** each
-  decoded, mimeType `image/jpeg`, `image/jpg`, `image/png`, `image/webp` or `image/gif`. The
-  first image is the base image (image, small_image, thumbnail); the rest go to the gallery.
-  Invalid entries are counted in `images.failed` with a warning `image #N: …`.
+  decoded, mimeType `image/jpeg`, `image/jpg`, `image/png` or `image/gif`. The decoded bytes
+  must be a real JPEG, PNG or GIF (`image #N: not an image` otherwise); the detected type sets the
+  file extension. **WebP is not supported** by Magento 2.3 (`image #N: webp not supported by
+  Magento 2.3`); the Girofeeds server converts WebP to JPEG before sending. The first image is
+  the base image (image, small_image, thumbnail); the rest go to the gallery. Invalid entries are
+  counted in `images.failed` with a warning `image #N: …`.
 - Only simple products (`type_id` = `simple`).
 - The request body must fit the web server and PHP limits (`client_max_body_size`,
   `post_max_size`): 10 images of several MB in base64 can exceed the defaults.
@@ -482,7 +491,10 @@ bin/magento cache:clean config
    categoría no encontrada en `warnings` (`Category path 'Ruta > Inexistente' not found…`).
 6. SKU nuevo con `"attribute_set": "NoExiste"` → HTTP 422, `status: error`,
    `message: attribute set not found`; no se crea nada.
-7. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
+7. SKU nuevo con una imagen cuyo `content` es el base64 de `hola` (`mimeType: image/jpeg`) →
+   `status: created`, aviso `image #1: not an image`, `images.failed: 1` y sin imagen en la
+   galería.
+8. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
 
 ## CLI Commands
 
