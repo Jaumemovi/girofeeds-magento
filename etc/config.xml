@@ -9,7 +9,15 @@
                 <add_disabled>0</add_disabled>
                 <stock>1</stock>
                 <rate_limit>600</rate_limit>
+                <write_scope>all</write_scope>
+                <version>1.26.0</version>
             </general>
+            <create>
+                <attribute_set>4</attribute_set>
+                <website_ids/>
+                <tax_class_id>2</tax_class_id>
+                <visibility>4</visibility>
+            </create>
             <data>
                 <name_attribute>name</name_attribute>
                 <description_attribute>description</description_attribute>

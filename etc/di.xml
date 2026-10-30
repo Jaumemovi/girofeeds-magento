@@ -6,6 +6,8 @@
                 type="Girofeeds\ProductApi\Model\Log\Repository"/>
     <preference for="Girofeeds\ProductApi\Api\UpdateProductInterface"
                 type="Girofeeds\ProductApi\Model\UpdateProduct"/>
+    <preference for="Girofeeds\ProductApi\Api\CreateProductInterface"
+                type="Girofeeds\ProductApi\Model\CreateProduct"/>
     <preference for="Girofeeds\ProductApi\Api\CountInterface"
                 type="Girofeeds\ProductApi\Model\Count"/>
     <preference for="Girofeeds\ProductApi\Api\TestInterface"
@@ -41,6 +43,8 @@
             <argument name="commands" xsi:type="array">
                 <item name="GirofeedsGenerateToken" xsi:type="object">Girofeeds\ProductApi\Console\Command\GenerateToken</item>
                 <item name="GirofeedsSelftest" xsi:type="object">Girofeeds\ProductApi\Console\Command\Selftest</item>
+                <item name="GirofeedsScopeRepair" xsi:type="object">Girofeeds\ProductApi\Console\Command\ScopeRepair</item>
+                <item name="GirofeedsScopeRestore" xsi:type="object">Girofeeds\ProductApi\Console\Command\ScopeRestore</item>
             </argument>
         </arguments>
     </type>

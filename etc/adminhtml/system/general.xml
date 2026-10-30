@@ -60,6 +60,41 @@
                 <validate>validate-digits validate-greater-than-zero</validate>
                 <comment>Maximum number of API requests accepted per minute for each API key. Requests above the limit are rejected with HTTP 429. Default: 600</comment>
             </field>
+            <!-- Default scope only: UpdateProduct reads this path without a store scope. -->
+            <field id="write_scope" translate="label comment" type="select" sortOrder="70" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Write Scope</label>
+                <source_model>Girofeeds\ProductApi\Model\System\Config\Source\WriteScope</source_model>
+                <config_path>girofeeds_productapi/general/write_scope</config_path>
+                <comment><![CDATA[Where product updates from Girofeeds are written. <strong>All Store Views</strong> (store_id 0, recommended) writes the default values whatever the REST route store view is. Choose a store view only to write values specific to that view. A request can still override it with the <code>store</code> parameter or the <code>store_id</code> payload field.]]></comment>
+            </field>
+        </group>
+        <!-- Default scope only: CreateProduct reads these paths without a store scope (products are created at store_id 0). -->
+        <group id="create" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+            <label>Product Creation</label>
+            <comment><![CDATA[Default values applied when Girofeeds creates a new product in this store. Products are always created as simple products with values for All Store Views (store_id 0).]]></comment>
+            <field id="attribute_set" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Attribute Set</label>
+                <source_model>Girofeeds\ProductApi\Model\System\Config\Source\AttributeSets</source_model>
+                <config_path>girofeeds_productapi/create/attribute_set</config_path>
+                <comment>Attribute set assigned to products created from Girofeeds. Default: Default (ID 4)</comment>
+            </field>
+            <field id="website_ids" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Website IDs</label>
+                <config_path>girofeeds_productapi/create/website_ids</config_path>
+                <comment>Comma-separated website IDs the new products are assigned to (for example: 1,2). Leave empty to use the website of the default store view.</comment>
+            </field>
+            <field id="tax_class_id" translate="label comment" type="select" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Tax Class</label>
+                <source_model>Girofeeds\ProductApi\Model\System\Config\Source\TaxClasses</source_model>
+                <config_path>girofeeds_productapi/create/tax_class_id</config_path>
+                <comment>Product tax class assigned to products created from Girofeeds. Default: Taxable Goods (ID 2)</comment>
+            </field>
+            <field id="visibility" translate="label comment" type="select" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Visibility</label>
+                <source_model>Magento\Catalog\Model\Product\Visibility</source_model>
+                <config_path>girofeeds_productapi/create/visibility</config_path>
+                <comment>Visibility assigned to products created from Girofeeds. Default: Catalog, Search</comment>
+            </field>
         </group>
         <group id="debug" translate="label" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
             <label>Debug &amp; Logging</label>

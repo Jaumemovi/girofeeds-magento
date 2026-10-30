@@ -32,6 +32,14 @@ class General extends AbstractHelper
     const XPATH_EXTENSION_VERSION = 'girofeeds_productapi/general/version';
     const XPATH_API_KEY = 'girofeeds_productapi/general/api_key';
     const XPATH_USE_ROW_ID = 'girofeeds_productapi/advanced/use_row_id';
+    const XPATH_WRITE_SCOPE = 'girofeeds_productapi/general/write_scope';
+    const XPATH_CREATE_ATTRIBUTE_SET = 'girofeeds_productapi/create/attribute_set';
+    const XPATH_CREATE_WEBSITE_IDS = 'girofeeds_productapi/create/website_ids';
+    const XPATH_CREATE_TAX_CLASS_ID = 'girofeeds_productapi/create/tax_class_id';
+    const XPATH_CREATE_VISIBILITY = 'girofeeds_productapi/create/visibility';
+    const DEFAULT_CREATE_ATTRIBUTE_SET = 4;
+    const DEFAULT_CREATE_TAX_CLASS_ID = 2;
+    const DEFAULT_CREATE_VISIBILITY = 4;
 
     /**
      * @var ProductMetadataInterface
@@ -123,6 +131,107 @@ class General extends AbstractHelper
     public function getApiKey()
     {
         return $this->getStoreValue(self::XPATH_API_KEY);
+    }
+
+    /**
+     * Configured write scope for product updates: 'all' (store_id 0) or a store view code
+     *
+     * @return string
+     */
+    public function getWriteScope(): string
+    {
+        $value = trim((string) $this->getStoreValue(
+            self::XPATH_WRITE_SCOPE,
+            null,
+            \Magento\Framework\App\Config\ScopeConfigInterface::SCOPE_TYPE_DEFAULT
+        ));
+
+        return $value === '' ? 'all' : $value;
+    }
+
+    /**
+     * Attribute set id for products created from Girofeeds (default scope)
+     *
+     * @return int
+     */
+    public function getCreateAttributeSetId(): int
+    {
+        $value = (int) $this->getDefaultScopeValue(self::XPATH_CREATE_ATTRIBUTE_SET);
+
+        return $value > 0 ? $value : self::DEFAULT_CREATE_ATTRIBUTE_SET;
+    }
+
+    /**
+     * Website ids for products created from Girofeeds (default scope).
+     * Empty config falls back to the website of the default store view.
+     *
+     * @return int[]
+     */
+    public function getCreateWebsiteIds(): array
+    {
+        $raw = trim((string) $this->getDefaultScopeValue(self::XPATH_CREATE_WEBSITE_IDS));
+        $websiteIds = [];
+        if ($raw !== '') {
+            foreach (explode(',', $raw) as $part) {
+                $websiteId = (int) trim($part);
+                if ($websiteId > 0 && !in_array($websiteId, $websiteIds, true)) {
+                    $websiteIds[] = $websiteId;
+                }
+            }
+        }
+
+        if (empty($websiteIds)) {
+            $defaultStore = $this->storeManager->getDefaultStoreView();
+            if ($defaultStore !== null) {
+                $websiteIds[] = (int) $defaultStore->getWebsiteId();
+            }
+        }
+
+        return $websiteIds;
+    }
+
+    /**
+     * Product tax class id for products created from Girofeeds (default scope).
+     * 0 (None) is a valid value; only an empty config falls back to the default.
+     *
+     * @return int
+     */
+    public function getCreateTaxClassId(): int
+    {
+        $value = trim((string) $this->getDefaultScopeValue(self::XPATH_CREATE_TAX_CLASS_ID));
+        if ($value === '' || !is_numeric($value) || (int) $value < 0) {
+            return self::DEFAULT_CREATE_TAX_CLASS_ID;
+        }
+
+        return (int) $value;
+    }
+
+    /**
+     * Visibility for products created from Girofeeds (default scope): 1..4
+     *
+     * @return int
+     */
+    public function getCreateVisibility(): int
+    {
+        $value = (int) $this->getDefaultScopeValue(self::XPATH_CREATE_VISIBILITY);
+
+        return ($value >= 1 && $value <= 4) ? $value : self::DEFAULT_CREATE_VISIBILITY;
+    }
+
+    /**
+     * Read a config path at default scope
+     *
+     * @param string $path
+     *
+     * @return mixed
+     */
+    private function getDefaultScopeValue($path)
+    {
+        return $this->getStoreValue(
+            $path,
+            null,
+            \Magento\Framework\App\Config\ScopeConfigInterface::SCOPE_TYPE_DEFAULT
+        );
     }
 
     /**

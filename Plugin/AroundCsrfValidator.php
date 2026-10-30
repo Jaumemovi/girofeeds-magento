@@ -14,6 +14,7 @@ class AroundCsrfValidator
     private const ALLOWED_ROUTES = [
         'girofeeds_feed_json',
         'girofeeds_updateproduct_index',
+        'girofeeds_createproduct_index',
         'girofeeds_count_index',
         'girofeeds_test_index',
     ];

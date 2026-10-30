@@ -19,6 +19,12 @@
             <resource ref="anonymous"/>
         </resources>
     </route>
+    <route url="/V1/girofeeds/createproduct" method="POST">
+        <service class="Girofeeds\ProductApi\Api\CreateProductInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
     <route url="/V1/girofeeds/feed" method="GET">
         <service class="Girofeeds\ProductApi\Api\FeedInterface" method="getFeed"/>
         <resources>

@@ -15,7 +15,17 @@ use Girofeeds\ProductApi\Model\Update\PriceUpdater;
 use Girofeeds\ProductApi\Model\Update\StockUpdater;
 use Girofeeds\ProductApi\Model\Update\ValidationService;
 use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Catalog\Model\Indexer\Product\Eav\Processor as EavIndexerProcessor;
+use Magento\Catalog\Model\Indexer\Product\Flat\Processor as FlatIndexerProcessor;
+use Magento\Catalog\Model\Indexer\Product\Price\Processor as PriceIndexerProcessor;
+use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Action as ProductAction;
+use Magento\Catalog\Model\Product\Url as ProductUrl;
+use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
+use Magento\CatalogSearch\Model\Indexer\Fulltext\Processor as FulltextIndexerProcessor;
+use Magento\Eav\Model\Config as EavConfig;
 use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Webapi\Rest\Response as RestResponse;
 use Magento\Store\Model\StoreManagerInterface;
@@ -97,6 +107,46 @@ class UpdateProduct implements UpdateProductInterface
     private $restResponse;
 
     /**
+     * @var ProductAction
+     */
+    private $productAction;
+
+    /**
+     * @var ProductResource
+     */
+    private $productResource;
+
+    /**
+     * @var EavConfig
+     */
+    private $eavConfig;
+
+    /**
+     * @var ProductUrl
+     */
+    private $productUrl;
+
+    /**
+     * @var PriceIndexerProcessor
+     */
+    private $priceIndexerProcessor;
+
+    /**
+     * @var EavIndexerProcessor
+     */
+    private $eavIndexerProcessor;
+
+    /**
+     * @var FlatIndexerProcessor
+     */
+    private $flatIndexerProcessor;
+
+    /**
+     * @var FulltextIndexerProcessor
+     */
+    private $fulltextIndexerProcessor;
+
+    /**
      * Constructor
      *
      * @param RequestInterface $request
@@ -114,6 +164,14 @@ class UpdateProduct implements UpdateProductInterface
      * @param ApiKeyValidator $apiKeyValidator
      * @param RateLimiter $rateLimiter
      * @param RestResponse $restResponse
+     * @param ProductAction $productAction
+     * @param ProductResource $productResource
+     * @param EavConfig $eavConfig
+     * @param ProductUrl $productUrl
+     * @param PriceIndexerProcessor $priceIndexerProcessor
+     * @param EavIndexerProcessor $eavIndexerProcessor
+     * @param FlatIndexerProcessor $flatIndexerProcessor
+     * @param FulltextIndexerProcessor $fulltextIndexerProcessor
      */
     public function __construct(
         RequestInterface $request,
@@ -130,7 +188,15 @@ class UpdateProduct implements UpdateProductInterface
         CategoryUpdater $categoryUpdater,
         ApiKeyValidator $apiKeyValidator,
         RateLimiter $rateLimiter,
-        RestResponse $restResponse
+        RestResponse $restResponse,
+        ProductAction $productAction,
+        ProductResource $productResource,
+        EavConfig $eavConfig,
+        ProductUrl $productUrl,
+        PriceIndexerProcessor $priceIndexerProcessor,
+        EavIndexerProcessor $eavIndexerProcessor,
+        FlatIndexerProcessor $flatIndexerProcessor,
+        FulltextIndexerProcessor $fulltextIndexerProcessor
     ) {
         $this->request = $request;
         $this->productRepository = $productRepository;
@@ -147,6 +213,14 @@ class UpdateProduct implements UpdateProductInterface
         $this->apiKeyValidator = $apiKeyValidator;
         $this->rateLimiter = $rateLimiter;
         $this->restResponse = $restResponse;
+        $this->productAction = $productAction;
+        $this->productResource = $productResource;
+        $this->eavConfig = $eavConfig;
+        $this->productUrl = $productUrl;
+        $this->priceIndexerProcessor = $priceIndexerProcessor;
+        $this->eavIndexerProcessor = $eavIndexerProcessor;
+        $this->flatIndexerProcessor = $flatIndexerProcessor;
+        $this->fulltextIndexerProcessor = $fulltextIndexerProcessor;
     }
 
     /**
@@ -195,8 +269,25 @@ class UpdateProduct implements UpdateProductInterface
 
             $productId = (int) $data['id_product'];
 
+            // Write scope: `store` param / `store_id` payload, else the configured scope (default All Store Views)
             try {
-                $product = $this->productRepository->getById($productId);
+                $storeId = $this->resolveWriteStoreId($data);
+            } catch (NoSuchEntityException $e) {
+                return $this->buildResponse(
+                    'error',
+                    $e->getMessage(),
+                    [],
+                    [],
+                    [],
+                    null,
+                    [$e->getMessage()],
+                    400
+                );
+            }
+            unset($data['store_id']);
+
+            try {
+                $product = $this->productRepository->getById($productId, false, $storeId);
             } catch (NoSuchEntityException $e) {
                 return $this->buildResponse(
                     'error',
@@ -209,27 +300,12 @@ class UpdateProduct implements UpdateProductInterface
                     404
                 );
             }
-
-            $storeCode = $this->request->getParam('store');
-            if ($storeCode) {
-                try {
-                    $store = $this->storeManager->getStore($storeCode);
-                    $product->setStoreId($store->getId());
-                } catch (NoSuchEntityException $e) {
-                    return $this->buildResponse(
-                        'error',
-                        "Store '{$storeCode}' not found",
-                        [],
-                        [],
-                        [],
-                        null,
-                        ["Store with code '{$storeCode}' does not exist"],
-                        400
-                    );
-                }
-            }
+            $product->setStoreId($storeId);
 
             $resolved = $this->fieldProcessor->resolveFields($data);
+            if (array_key_exists('url_key', $resolved)) {
+                $resolved['url_key'] = $this->productUrl->formatUrlKey((string) $resolved['url_key']);
+            }
 
             $validationErrors = $this->validationService->validate($resolved);
             if (!empty($validationErrors)) {
@@ -239,24 +315,77 @@ class UpdateProduct implements UpdateProductInterface
             $updatedFields = [];
             $warnings = [];
             $failedFields = [];
+            // Attribute codes set on the product by the processors => request field name
+            $touchedAttributes = [];
 
-            $this->processTextAttributes($product, $resolved, $updatedFields);
-            $this->processNumericAttributes($product, $resolved, $updatedFields);
-            $this->processSelectAttributes($product, $resolved, $updatedFields, $warnings, $failedFields);
-            $this->processIdentifierFields($product, $resolved, $updatedFields);
-            $this->processStatusAndVisibility($product, $resolved, $updatedFields);
-            $this->processCustomMappedAttributes($product, $resolved, $updatedFields);
+            $this->processTextAttributes($product, $resolved, $updatedFields, $touchedAttributes);
+            $this->processNumericAttributes($product, $resolved, $updatedFields, $touchedAttributes);
+            $this->processSelectAttributes(
+                $product,
+                $resolved,
+                $updatedFields,
+                $warnings,
+                $failedFields,
+                $touchedAttributes
+            );
+            $this->processIdentifierFields($product, $resolved, $updatedFields, $touchedAttributes);
+            $this->processStatusAndVisibility($product, $resolved, $updatedFields, $touchedAttributes);
+            $this->processCustomMappedAttributes($product, $resolved, $updatedFields, $touchedAttributes);
 
+            $specialFromDate = $product->getData('special_from_date');
             $priceWarnings = $this->priceUpdater->updatePrices($product, $resolved);
             $warnings = array_merge($warnings, $priceWarnings);
             foreach (['price', 'special_price', 'cost'] as $pf) {
                 if (array_key_exists($pf, $resolved) && !in_array($pf, $failedFields)) {
                     $updatedFields[] = $pf;
+                    if ($pf !== 'price' || (float) $resolved['price'] > 0) {
+                        $touchedAttributes[$pf] = $pf;
+                    }
+                }
+            }
+            if ($product->getData('special_from_date') !== $specialFromDate) {
+                $touchedAttributes['special_from_date'] = 'special_price';
+            }
+
+            $hasCategories = array_key_exists('category_ids', $resolved) || array_key_exists('category', $resolved);
+            if ($hasCategories) {
+                $categoryWarnings = $this->categoryUpdater->updateCategories($product, $resolved, $storeId);
+                $warnings = array_merge($warnings, $categoryWarnings);
+                $updatedFields[] = array_key_exists('category_ids', $resolved) ? 'category_ids' : 'category';
+            }
+
+            $imagesAdded = 0;
+            if (array_key_exists('image_link', $resolved) || array_key_exists('additional_images', $resolved)) {
+                $imageResult = $this->imageUpdater->updateImages($product, $resolved);
+                $warnings = array_merge($warnings, $imageResult['warnings']);
+                $imagesAdded = (int) $imageResult['added'];
+                if (array_key_exists('image_link', $resolved)) {
+                    $updatedFields[] = 'image_link';
+                }
+                if (array_key_exists('additional_images', $resolved)) {
+                    $updatedFields[] = 'additional_images';
                 }
             }
 
+            // Full save only when Magento's save observers are needed: url_key (format, uniqueness,
+            // URL rewrites), categories (links + category URL rewrites) or newly added images
+            $savedFull = array_key_exists('url_key', $resolved) || $hasCategories || $imagesAdded > 0;
+
             try {
-                $this->productRepository->save($product);
+                $attributeData = $this->collectAttributeData(
+                    $product,
+                    $productId,
+                    $touchedAttributes,
+                    $updatedFields,
+                    $warnings,
+                    $failedFields
+                );
+
+                if ($savedFull) {
+                    $this->saveFullProduct($product, $storeId, $hasCategories);
+                } else {
+                    $this->saveAttributes($product, $productId, $storeId, $attributeData);
+                }
             } catch (\Exception $e) {
                 return $this->buildResponse(
                     'error',
@@ -278,24 +407,9 @@ class UpdateProduct implements UpdateProductInterface
                 }
             }
 
-            $categoryWarnings = $this->categoryUpdater->updateCategories($product, $resolved);
-            $warnings = array_merge($warnings, $categoryWarnings);
-            if (array_key_exists('category_ids', $resolved) || array_key_exists('category', $resolved)) {
-                try {
-                    $this->productRepository->save($product);
-                } catch (\Exception $e) {
-                    $warnings[] = "Category save failed: " . $e->getMessage();
-                }
-                $updatedFields[] = array_key_exists('category_ids', $resolved) ? 'category_ids' : 'category';
-            }
-
-            $imageWarnings = $this->imageUpdater->updateImages($product, $resolved);
-            $warnings = array_merge($warnings, $imageWarnings);
-            if (array_key_exists('image_link', $resolved)) {
-                $updatedFields[] = 'image_link';
-            }
-            if (array_key_exists('additional_images', $resolved)) {
-                $updatedFields[] = 'additional_images';
+            // The full save reindexes by itself; the attribute-only path does not
+            if (!$savedFull && (!empty($attributeData['eav']) || !empty($attributeData['static']))) {
+                $this->reindexProduct($productId, $warnings);
             }
 
             $updatedFields = array_values(array_unique($updatedFields));
@@ -307,7 +421,11 @@ class UpdateProduct implements UpdateProductInterface
                     $updatedFields,
                     [],
                     [],
-                    $productId
+                    $productId,
+                    [],
+                    200,
+                    $storeId,
+                    $savedFull
                 );
             }
 
@@ -317,7 +435,11 @@ class UpdateProduct implements UpdateProductInterface
                 $updatedFields,
                 $warnings,
                 $failedFields,
-                $productId
+                $productId,
+                [],
+                200,
+                $storeId,
+                $savedFull
             );
         } catch (\Exception $e) {
             $this->generalHelper->addTolog('UpdateProduct', $e->getMessage());
@@ -340,10 +462,15 @@ class UpdateProduct implements UpdateProductInterface
      * @param \Magento\Catalog\Api\Data\ProductInterface $product
      * @param array $resolved
      * @param array $updatedFields
+     * @param array $touchedAttributes
      * @return void
      */
-    private function processTextAttributes($product, array $resolved, array &$updatedFields)
-    {
+    private function processTextAttributes(
+        $product,
+        array $resolved,
+        array &$updatedFields,
+        array &$touchedAttributes
+    ) {
         $textFields = [
             'name', 'description', 'short_description',
             'meta_title', 'meta_description', 'meta_keyword',
@@ -355,6 +482,7 @@ class UpdateProduct implements UpdateProductInterface
                 $magentoAttr = $field === 'country_of_origin' ? 'country_of_manufacture' : $field;
                 $product->setData($magentoAttr, $resolved[$field]);
                 $updatedFields[] = $field;
+                $touchedAttributes[$magentoAttr] = $field;
             }
         }
     }
@@ -365,16 +493,22 @@ class UpdateProduct implements UpdateProductInterface
      * @param \Magento\Catalog\Api\Data\ProductInterface $product
      * @param array $resolved
      * @param array $updatedFields
+     * @param array $touchedAttributes
      * @return void
      */
-    private function processNumericAttributes($product, array $resolved, array &$updatedFields)
-    {
+    private function processNumericAttributes(
+        $product,
+        array $resolved,
+        array &$updatedFields,
+        array &$touchedAttributes
+    ) {
         $numericFields = ['weight', 'length', 'width', 'height'];
 
         foreach ($numericFields as $field) {
             if (array_key_exists($field, $resolved)) {
                 $product->setData($field, (float) $resolved[$field]);
                 $updatedFields[] = $field;
+                $touchedAttributes[$field] = $field;
             }
         }
     }
@@ -387,6 +521,7 @@ class UpdateProduct implements UpdateProductInterface
      * @param array $updatedFields
      * @param array $warnings
      * @param array $failedFields
+     * @param array $touchedAttributes
      * @return void
      */
     private function processSelectAttributes(
@@ -394,7 +529,8 @@ class UpdateProduct implements UpdateProductInterface
         array $resolved,
         array &$updatedFields,
         array &$warnings,
-        array &$failedFields
+        array &$failedFields,
+        array &$touchedAttributes
     ) {
         $selectFields = [
             'color'    => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_COLOR_SOURCE),
@@ -409,13 +545,15 @@ class UpdateProduct implements UpdateProductInterface
                 $warning = $this->attributeUpdater->updateSelectAttribute(
                     $product,
                     $magentoAttribute,
-                    (string) $resolved[$requestField]
+                    (string) $resolved[$requestField],
+                    (int) $product->getStoreId()
                 );
                 if ($warning) {
                     $warnings[] = "Field '{$requestField}': {$warning}";
                     $failedFields[] = $requestField;
                 } else {
                     $updatedFields[] = $requestField;
+                    $touchedAttributes[$magentoAttribute] = $requestField;
                 }
             }
         }
@@ -427,13 +565,19 @@ class UpdateProduct implements UpdateProductInterface
      * @param \Magento\Catalog\Api\Data\ProductInterface $product
      * @param array $resolved
      * @param array $updatedFields
+     * @param array $touchedAttributes
      * @return void
      */
-    private function processIdentifierFields($product, array $resolved, array &$updatedFields)
-    {
+    private function processIdentifierFields(
+        $product,
+        array $resolved,
+        array &$updatedFields,
+        array &$touchedAttributes
+    ) {
         if (array_key_exists('sku', $resolved)) {
             $product->setSku($resolved['sku']);
             $updatedFields[] = 'sku';
+            $touchedAttributes['sku'] = 'sku';
         }
 
         if (array_key_exists('ean', $resolved)) {
@@ -441,6 +585,7 @@ class UpdateProduct implements UpdateProductInterface
             if ($eanAttribute) {
                 $product->setData($eanAttribute, $resolved['ean']);
                 $updatedFields[] = 'ean';
+                $touchedAttributes[$eanAttribute] = 'ean';
             }
         }
     }
@@ -451,10 +596,15 @@ class UpdateProduct implements UpdateProductInterface
      * @param \Magento\Catalog\Api\Data\ProductInterface $product
      * @param array $resolved
      * @param array $updatedFields
+     * @param array $touchedAttributes
      * @return void
      */
-    private function processStatusAndVisibility($product, array $resolved, array &$updatedFields)
-    {
+    private function processStatusAndVisibility(
+        $product,
+        array $resolved,
+        array &$updatedFields,
+        array &$touchedAttributes
+    ) {
         if (array_key_exists('status', $resolved)) {
             $status = $resolved['status'];
             if (is_bool($status) || in_array($status, ['true', 'false', '0', '1', 0, 1], true)) {
@@ -462,11 +612,13 @@ class UpdateProduct implements UpdateProductInterface
             }
             $product->setStatus((int) $status);
             $updatedFields[] = 'status';
+            $touchedAttributes['status'] = 'status';
         }
 
         if (array_key_exists('visibility', $resolved)) {
             $product->setVisibility((int) $resolved['visibility']);
             $updatedFields[] = 'visibility';
+            $touchedAttributes['visibility'] = 'visibility';
         }
     }
 
@@ -476,10 +628,15 @@ class UpdateProduct implements UpdateProductInterface
      * @param \Magento\Catalog\Api\Data\ProductInterface $product
      * @param array $resolved
      * @param array $updatedFields
+     * @param array $touchedAttributes
      * @return void
      */
-    private function processCustomMappedAttributes($product, array $resolved, array &$updatedFields)
-    {
+    private function processCustomMappedAttributes(
+        $product,
+        array $resolved,
+        array &$updatedFields,
+        array &$touchedAttributes
+    ) {
         $extraFields = $this->sourceHelper->getExtraFields();
         if (empty($extraFields)) {
             return;
@@ -497,6 +654,192 @@ class UpdateProduct implements UpdateProductInterface
                 $magentoAttr = $reverseMappings[$field];
                 $product->setData($magentoAttr, $value);
                 $updatedFields[] = $field;
+                $touchedAttributes[$magentoAttr] = $field;
+            }
+        }
+    }
+
+    /**
+     * Resolve the store id updates are written to.
+     *
+     * The `store` request param or the `store_id` payload field win ('all', 'admin' or '0' => 0,
+     * a store code or id => that store); otherwise the configured write scope ('all' => 0).
+     * The store view of the REST route is never used.
+     *
+     * @param array $data
+     * @return int
+     * @throws NoSuchEntityException
+     */
+    private function resolveWriteStoreId(array $data): int
+    {
+        $requested = $this->request->getParam('store');
+        if (($requested === null || $requested === '') && array_key_exists('store_id', $data)) {
+            $requested = $data['store_id'];
+        }
+
+        if ($requested !== null && $requested !== '') {
+            return $this->resolveStoreValue((string) $requested, 'Store');
+        }
+
+        return $this->resolveStoreValue($this->generalHelper->getWriteScope(), 'Configured write scope store');
+    }
+
+    /**
+     * Map a scope value ('all', 'admin', '0', store code or id) to a store id
+     *
+     * @param string $value
+     * @param string $label
+     * @return int
+     * @throws NoSuchEntityException
+     */
+    private function resolveStoreValue(string $value, string $label): int
+    {
+        $value = trim($value);
+        if (in_array(strtolower($value), ['all', 'admin', '0'], true)) {
+            return 0;
+        }
+
+        try {
+            return (int) $this->storeManager->getStore($value)->getId();
+        } catch (NoSuchEntityException $e) {
+            throw new NoSuchEntityException(__("%1 '%2' not found", $label, $value));
+        }
+    }
+
+    /**
+     * Split the touched attributes into EAV and static (entity table) values.
+     *
+     * Unknown attribute codes are reported as failed fields. A duplicate SKU throws before anything
+     * is written, as the full save did.
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param int $productId
+     * @param array $touchedAttributes
+     * @param array $updatedFields
+     * @param array $warnings
+     * @param array $failedFields
+     * @return array ['eav' => code => value, 'static' => code => value]
+     * @throws LocalizedException
+     */
+    private function collectAttributeData(
+        $product,
+        int $productId,
+        array $touchedAttributes,
+        array &$updatedFields,
+        array &$warnings,
+        array &$failedFields
+    ): array {
+        $attributeData = ['eav' => [], 'static' => []];
+
+        foreach ($touchedAttributes as $code => $field) {
+            $attribute = $this->eavConfig->getAttribute(Product::ENTITY, $code);
+            if (!$attribute || !$attribute->getId()) {
+                $warnings[] = "Field '{$field}': attribute '{$code}' does not exist, value not saved";
+                $failedFields[] = $field;
+                $updatedFields = array_values(array_diff($updatedFields, [$field]));
+                continue;
+            }
+
+            $value = $product->getData($code);
+            if (is_array($value)) {
+                $value = implode(',', $value);
+            }
+
+            $attributeData[$attribute->isStatic() ? 'static' : 'eav'][$code] = $value;
+        }
+
+        if (array_key_exists('sku', $attributeData['static'])) {
+            $sku = $attributeData['static']['sku'];
+            $existingId = $this->productResource->getIdBySku($sku);
+            if ($existingId && (int) $existingId !== $productId) {
+                throw new LocalizedException(__("SKU '%1' is already used by product %2", $sku, $existingId));
+            }
+        }
+
+        return $attributeData;
+    }
+
+    /**
+     * Write only the touched attributes at the given store id (no product save).
+     *
+     * EAV attributes go through Product\Action::updateAttributes (respects each attribute's
+     * global/website/store scope and leaves the other attributes untouched). Static attributes
+     * (sku) live in the entity table and are written there.
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param int $productId
+     * @param int $storeId
+     * @param array $attributeData from collectAttributeData()
+     * @return void
+     * @throws \Exception
+     */
+    private function saveAttributes($product, int $productId, int $storeId, array $attributeData)
+    {
+        if (!empty($attributeData['static'])) {
+            $linkField = $this->productResource->getLinkField();
+            $this->productResource->getConnection()->update(
+                $this->productResource->getEntityTable(),
+                $attributeData['static'],
+                [$linkField . ' = ?' => $product->getData($linkField)]
+            );
+        }
+
+        if (!empty($attributeData['eav'])) {
+            $this->productAction->updateAttributes([$productId], $attributeData['eav'], $storeId);
+        }
+    }
+
+    /**
+     * Full product save with the resource model at the resolved store id.
+     *
+     * The resource model keeps the product's store id (ProductRepository::save would force the
+     * request's store view) and runs the save observers: url_key formatting/uniqueness, URL
+     * rewrites, category links and media gallery. A duplicate url_key throws.
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param int $storeId
+     * @param bool $hasCategories
+     * @return void
+     * @throws \Exception
+     */
+    private function saveFullProduct($product, int $storeId, bool $hasCategories)
+    {
+        if ($hasCategories) {
+            // The links loaded with the product are stale; the save handler must use category_ids
+            $extensionAttributes = $product->getExtensionAttributes();
+            if ($extensionAttributes && method_exists($extensionAttributes, 'setCategoryLinks')) {
+                $extensionAttributes->setCategoryLinks(null);
+            }
+        }
+
+        $product->setStoreId($storeId);
+        $this->productResource->save($product);
+    }
+
+    /**
+     * Reindex one product after an attribute-only write (price, EAV, flat, fulltext), skipping
+     * indexers in "Update by Schedule" mode. Failures become warnings.
+     *
+     * @param int $productId
+     * @param array $warnings
+     * @return void
+     */
+    private function reindexProduct(int $productId, array &$warnings)
+    {
+        $processors = [
+            'price' => $this->priceIndexerProcessor,
+            'eav' => $this->eavIndexerProcessor,
+            'flat' => $this->flatIndexerProcessor,
+            'fulltext' => $this->fulltextIndexerProcessor,
+        ];
+
+        foreach ($processors as $name => $processor) {
+            try {
+                if (!$processor->isIndexerScheduled()) {
+                    $processor->reindexRow($productId);
+                }
+            } catch (\Exception $e) {
+                $warnings[] = "Reindex ({$name}) failed: " . $e->getMessage();
             }
         }
     }
@@ -512,6 +855,8 @@ class UpdateProduct implements UpdateProductInterface
      * @param int|null $productId
      * @param array $errors
      * @param int $httpCode
+     * @param int|null $storeId effective write store id (success responses)
+     * @param bool|null $savedFull whether the product was saved as a whole (success responses)
      * @return string
      */
     private function buildResponse(
@@ -522,7 +867,9 @@ class UpdateProduct implements UpdateProductInterface
         array $failedFields = [],
         $productId = null,
         array $errors = [],
-        int $httpCode = 200
+        int $httpCode = 200,
+        $storeId = null,
+        $savedFull = null
     ) {
         $this->restResponse->setHttpResponseCode($httpCode);
 
@@ -538,6 +885,13 @@ class UpdateProduct implements UpdateProductInterface
                 $response['failed_fields'] = $failedFields;
             }
             $response['product_id'] = $productId;
+            if ($storeId !== null) {
+                $response['store_id'] = (int) $storeId;
+                $response['scope'] = (int) $storeId === 0 ? 'all' : 'store';
+            }
+            if ($savedFull !== null) {
+                $response['saved_full'] = (bool) $savedFull;
+            }
         } else {
             $response['errors'] = $errors;
         }

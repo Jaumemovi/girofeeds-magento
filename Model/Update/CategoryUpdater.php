@@ -40,9 +40,10 @@ class CategoryUpdater
      *
      * @param ProductInterface $product
      * @param array $resolvedData
+     * @param int $storeId write store id; category names are matched in admin (0) first, then here
      * @return array
      */
-    public function updateCategories(ProductInterface $product, array $resolvedData)
+    public function updateCategories(ProductInterface $product, array $resolvedData, $storeId = 0)
     {
         $warnings = [];
 
@@ -62,7 +63,7 @@ class CategoryUpdater
 
         if (array_key_exists('category', $resolvedData) && is_string($resolvedData['category'])) {
             $categoryPath = $resolvedData['category'];
-            $categoryId = $this->findCategoryByPath($categoryPath);
+            $categoryId = $this->findCategoryByPath($categoryPath, (int) $storeId);
 
             if ($categoryId) {
                 $existingIds = $product->getCategoryIds();
@@ -82,19 +83,23 @@ class CategoryUpdater
      * Find category by path
      *
      * @param string $path
+     * @param int $storeId
      * @return int|null
      */
-    private function findCategoryByPath($path)
+    private function findCategoryByPath($path, $storeId)
     {
         $parts = array_map('trim', explode(' > ', $path));
         $lastCategoryName = end($parts);
 
-        $collection = $this->categoryCollectionFactory->create()
-            ->addAttributeToFilter('name', $lastCategoryName)
-            ->setPageSize(1);
+        foreach (array_unique([0, $storeId]) as $nameStoreId) {
+            $collection = $this->categoryCollectionFactory->create()
+                ->setStoreId($nameStoreId)
+                ->addAttributeToFilter('name', $lastCategoryName)
+                ->setPageSize(1);
 
-        if ($collection->getSize() > 0) {
-            return (int) $collection->getFirstItem()->getId();
+            if ($collection->getSize() > 0) {
+                return (int) $collection->getFirstItem()->getId();
+            }
         }
 
         return null;
