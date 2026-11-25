@@ -429,6 +429,13 @@ Response (HTTP 200):
   sending `manage_stock` does not change `use_config_manage_stock`, and **`manage_stock` only
   takes effect when `use_config_manage_stock` is 0** (send both, e.g.
   `"use_config_manage_stock": 0, "manage_stock": 0`).
+  On **create only** (1.27.0), `manage_stock` and `use_config_manage_stock` take the yes/no rule
+  of the added attributes: yes = `true`, `1`, `'1'`, `'true'`, `'yes'`, `'si'`, `'sí'`; no =
+  `false`, `0`, `'0'`, `'false'`, `'no'` (case-insensitive), so a fixed «Sí» means yes. An empty
+  value counts as not sent (`manage_stock` then takes its default 1). Any other value is not
+  applied: warning `Field '<code>' ignored: invalid boolean value` and a failed field
+  (`manage_stock` then takes its default 1). `updateproduct` and `is_in_stock` keep the rule
+  above.
 - Any other field that is a product attribute is written too (see **Added attributes**).
 - After the save the product row is reindexed (price, EAV, flat, fulltext) for the indexers that
   are not in "Update by Schedule" mode.
@@ -479,14 +486,22 @@ bin/magento cache:clean config
 Capability `create_custom_attributes` (test endpoint). Besides the fields above, every request
 key that is a **product attribute** is written on create, at store 0. Keys the create flow already
 reads (directly, as an alias or by priority: `sku`, `reference`, `name`, prices, `status`,
-`active`, `visibility`, `visible`, `attribute_set`, `ean`/`ean13`/`gtin`, `brand`, `color`,
-`size`, `material`, `gender`, `weight`, `tax_class_id`, `website_ids`, `url_key`, descriptions,
+`active`, `visibility`, `visible`, `attribute_set`, `ean`/`ean13`/`gtin`, `brand`, `color`*,
+`size`*, `material`*, `gender`*, `weight`, `tax_class_id`, `website_ids`, `url_key`, descriptions,
 images, categories), the stock fields (`qty`, `stock`, `is_in_stock`, `manage_stock`,
 `use_config_manage_stock`, `min_sale_qty`, `max_sale_qty`, `backorders`), request metadata
 (`store`, `store_id`, `id_product`, `key`) and system data (`id`, `entity_id`,
 `attribute_set_id`, `type_id`, `created_at`, `updated_at`, `has_options`, `required_options`,
 `media_gallery`, `gallery`, `tier_price`, `quantity_and_stock_status`) are never treated as added
 attributes (list: `CustomAttributeWriter::RESERVED_KEYS`).
+
+\* `color`, `size`, `material` and `gender` are reserved only while **Data > Color / Size /
+Material / Gender** has a source attribute configured: then, as in 1.26.0, the value goes to
+**that configured attribute** (by label) and not to an attribute named `color`/…. Without a
+configured source attribute (where 1.26.0 dropped the value silently), the key is written as
+its own attribute code with every rule below (attribute lookup, attribute set, label or option
+id, warnings, failed fields). `brand` is not part of this rule: it behaves as in 1.26.0 in every
+configuration.
 
 `manufacturer` is not reserved: as in 1.26.0 it is the `brand` alias when `brand` is not sent,
 and it is also written to the `manufacturer` attribute when that attribute exists.
@@ -507,6 +522,10 @@ equal to one of those attribute codes is then skipped:
 
 With any other **Data > Brand** attribute (or none), `manufacturer` is written by the generic
 writer as described below (label or option id), and `brand` goes to the configured attribute.
+
+The attribute configured in **Data > EAN** counts as handled in the same way when the request
+carries `ean` (or `ean13` / `gtin`): the EAN step writes it, and a raw key equal to that
+attribute code is skipped with `Field '<code>' ignored: the attribute is handled by 'ean'`.
 
 **Attributes never written** (`CustomAttributeWriter::BLOCKED_ATTRIBUTES`): `custom_layout_update`,
 `custom_layout_update_file`, `custom_layout`, `custom_design`, `custom_design_from`,
@@ -616,10 +635,19 @@ acabar.
    opción nueva en el atributo.
 5. Añadir una clave que no es atributo (`"campo_inventado": "x"`) → `status: created` con el
    aviso `Field 'campo_inventado' ignored: not a product attribute`.
-6. Stock: SKU nuevo solo con `"manage_stock": 0` → «Use Config Settings» sigue marcado (el
-   valor efectivo es el de la configuración). SKU nuevo con `"use_config_manage_stock": 0` y
-   `"manage_stock": 1` → «Manage Stock» = Sí con «Use Config Settings» desmarcado. Con
-   `updateproduct`, enviar `"use_config_manage_stock": 1` a uno de ellos → vuelve a marcarse.
+6. Stock:
+   - SKU nuevo con `"manage_stock": 0` y `"use_config_manage_stock": 0` → en el admin,
+     **Advanced Inventory**: «Use Config Settings» de Manage Stock **desmarcado** y «Manage
+     Stock» = **No**.
+   - SKU nuevo con `"manage_stock": "no"` y `"use_config_manage_stock": "Sí"` → «Use Config
+     Settings» marcado (el valor efectivo es el de la configuración), sin avisos.
+   - SKU nuevo solo con `"manage_stock": 0` → «Use Config Settings» sigue marcado.
+   - SKU nuevo con `"use_config_manage_stock": 0` y `"manage_stock": 1` → «Manage Stock» = Sí con
+     «Use Config Settings» desmarcado.
+   - SKU nuevo con `"manage_stock": "quizás"` → `status: created`, aviso
+     `Field 'manage_stock' ignored: invalid boolean value` y `failed_fields` con `manage_stock`.
+   - Con `updateproduct`, enviar `"use_config_manage_stock": 1` a uno de ellos → vuelve a
+     marcarse.
 7. `manufacturer` y `brand` (A y B, etiquetas existentes de `manufacturer`):
    - SKU nuevo con `"brand": "A"` y `"manufacturer": "B"`. Si el atributo de marca es
      `manufacturer` → `manufacturer` = A y aviso
@@ -633,6 +661,11 @@ acabar.
      con `brand`, igual que en la 1.26.0 (en esa configuración solo vale la etiqueta).
    - SKU nuevo con `"custom_layout_update": "<x/>"` → aviso
      `Field 'custom_layout_update' ignored: attribute not allowed` y el campo vacío en el admin.
+   - `color` (igual `size`, `material`, `gender`): anotar **Data > Color**. Si tiene un atributo
+     configurado, SKU nuevo con `"color": "<etiqueta de ese atributo>"` → el valor va a **ese
+     atributo configurado**, no a `color` (como en la 1.26.0). Si no lo tiene, con
+     `"color": "<etiqueta del atributo color>"` → se escribe el atributo `color`; con una
+     etiqueta inexistente → aviso `Field 'color': Value … is not a valid option…`.
 8. Repetir **la misma petición** del paso 3 → `status: exists`, mismo `product_id`, sin cambios.
 9. Un `updateproduct` normal a un producto existente sigue funcionando igual que con la 1.26.0.
 10. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
