@@ -481,6 +481,10 @@ bin/magento config:set girofeeds_productapi/create/visibility 4
 bin/magento cache:clean config
 ```
 
+### Product Feed configuration fixed (1.27.0)
+
+The **Stores > Configuration > Girofeeds > Product Feed** section rendered empty (outside developer mode) since the renderer of the «Actions» column of **Extra Fields** (`Block/Adminhtml/System/Config/Form/Field/Renderer/Actions.php`) was removed; 1.27.0 restores it.
+
 ### Price 0 for products created disabled (1.27.0)
 
 On **create only**, a price equal to `0` (`0`, `"0"`, `"0.00"`) is accepted when the product is
@@ -626,7 +630,13 @@ acabar.
 
 2. `GET /rest/all/V1/girofeeds/test?key=<key>` → `version` 1.27.0 y `capabilities` incluye
    `create_custom_attributes` (además de `createproduct`).
-3. En el admin, anotar el atributo de **Stores > Configuration > Girofeeds > Data > Brand** (en
+3. Abrir **Stores > Configuration > Girofeeds > Product Feed** → la sección se muestra entera
+   (antes salía vacía), con **Product Data Settings**. Elegir en **EAN / GTIN** el atributo de EAN
+   de la tienda (lacoop: `gtin`), guardar y limpiar la caché de configuración. Después, crear un
+   producto con SKU nuevo y `"ean": "<EAN de prueba>"` → `status: created`; en el admin (All Store
+   Views) el atributo elegido tiene ese EAN. Repetir la petición con otro SKU y el mismo `ean` →
+   `status: exists` con el `product_id` anterior (idempotencia por EAN).
+4. En el admin, anotar el atributo de **Stores > Configuration > Girofeeds > Product Feed > Product Data Settings > Brand** («Data > Brand») (en
    adelante «atributo de marca») y el tipo de `am_shipping_type`, `availability`, `mpn` y
    `manufacturer` (**Stores > Attributes > Product**), y comprobar que están en el conjunto de
    atributos con el que se crea (por defecto el de **Product Creation**). Elegir para
@@ -640,13 +650,13 @@ acabar.
    desmarcado. (Si el atributo de marca no tiene esa etiqueta, el producto se crea igual con
    `manufacturer` escrito y el aviso `Field 'brand': …`, como en la 1.26.0. Si no hay atributo
    de marca configurado, solo se comprueba `manufacturer`, y `warnings` queda vacío.)
-4. Igual que el paso 3 pero con `"am_shipping_type": "NoExiste"` → `status: created`, aviso
+5. Igual que el paso 4 pero con `"am_shipping_type": "NoExiste"` → `status: created`, aviso
    `Field 'am_shipping_type': Value 'NoExiste' is not a valid option … Available options: …`,
    `failed_fields` con `am_shipping_type`; el producto se crea sin ese valor y no aparece ninguna
    opción nueva en el atributo.
-5. Añadir una clave que no es atributo (`"campo_inventado": "x"`) → `status: created` con el
+6. Añadir una clave que no es atributo (`"campo_inventado": "x"`) → `status: created` con el
    aviso `Field 'campo_inventado' ignored: not a product attribute`.
-6. Stock:
+7. Stock:
    - SKU nuevo con `"manage_stock": 0` y `"use_config_manage_stock": 0` → en el admin,
      **Advanced Inventory**: «Use Config Settings» de Manage Stock **desmarcado** y «Manage
      Stock» = **No**.
@@ -659,7 +669,7 @@ acabar.
      `Field 'manage_stock' ignored: invalid boolean value` y `failed_fields` con `manage_stock`.
    - Con `updateproduct`, enviar `"use_config_manage_stock": 1` a uno de ellos → vuelve a
      marcarse.
-7. `manufacturer` y `brand` (A y B, etiquetas existentes de `manufacturer`):
+8. `manufacturer` y `brand` (A y B, etiquetas existentes de `manufacturer`):
    - SKU nuevo con `"brand": "A"` y `"manufacturer": "B"`. Si el atributo de marca es
      `manufacturer` → `manufacturer` = A y aviso
      `Field 'manufacturer' ignored: the attribute is handled by 'brand'` (sin
@@ -677,14 +687,14 @@ acabar.
      atributo configurado**, no a `color` (como en la 1.26.0). Si no lo tiene, con
      `"color": "<etiqueta del atributo color>"` → se escribe el atributo `color`; con una
      etiqueta inexistente → aviso `Field 'color': Value … is not a valid option…`.
-8. Precio 0: SKU nuevo con `"price": "0"` y `"status": "0"` → `status: created` sin avisos de
+9. Precio 0: SKU nuevo con `"price": "0"` y `"status": "0"` → `status: created` sin avisos de
    precio; en el admin el producto está **deshabilitado** con precio 0. El mismo con
    `"status": "1"` (o sin `status`) → HTTP 422 `Field 'price' must be a positive number` y no se
    crea nada. Con `"price": -1` y `"status": "0"` → 422.
-9. Repetir **la misma petición** del paso 3 → `status: exists`, mismo `product_id`, sin cambios.
-10. Un `updateproduct` normal a un producto existente sigue funcionando igual que con la 1.26.0
+10. Repetir **la misma petición** del paso 4 → `status: exists`, mismo `product_id`, sin cambios.
+11. Un `updateproduct` normal a un producto existente sigue funcionando igual que con la 1.26.0
     (también `"price": 0` sigue dando `Field 'price' must be a positive number`).
-11. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
+12. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
 
 ## CLI Commands
 
