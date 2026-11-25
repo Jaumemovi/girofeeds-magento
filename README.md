@@ -441,7 +441,7 @@ Response (HTTP 200):
   are not in "Update by Schedule" mode.
 
 HTTP codes (REST route `POST /rest/all/V1/girofeeds/createproduct`): 400 invalid JSON,
-401/403 API key, 422 validation (`missing: sku|name|price`, `price` ≤ 0,
+401/403 API key, 422 validation (`missing: sku|name|price`, `price` ≤ 0 (0 is allowed for a disabled product),
 `attribute set not found`), 429 rate limit, 500 save or internal error. The frontend route
 `/girofeeds/createproduct/index` always answers HTTP 200, like `updateproduct`; read `status`
 (and `errors`) in the JSON body.
@@ -480,6 +480,17 @@ bin/magento config:set girofeeds_productapi/create/tax_class_id 2
 bin/magento config:set girofeeds_productapi/create/visibility 4
 bin/magento cache:clean config
 ```
+
+### Price 0 for products created disabled (1.27.0)
+
+On **create only**, a price equal to `0` (`0`, `"0"`, `"0.00"`) is accepted when the product is
+created **disabled**: `status` (or its alias `active`) is `"0"`, `2`, `"2"`, `false` or `"false"`.
+The product is saved with price 0 and no price warning. Everything else is as in 1.26.0: price 0
+with `status` enabled or absent (default enabled) → HTTP 422 `Field 'price' must be a positive
+number`; a negative or non-numeric price → 422 whatever the status; a missing or empty price →
+`missing: price`; an invalid `status` (including the integer `0`, which the status rule never
+accepted; send `"0"`) → 422 `Field 'status' must be 1 (enabled) or 2 (disabled)`. `updateproduct`
+and `special_price` do not change.
 
 ### Added attributes (1.27.0)
 
@@ -666,9 +677,14 @@ acabar.
      atributo configurado**, no a `color` (como en la 1.26.0). Si no lo tiene, con
      `"color": "<etiqueta del atributo color>"` → se escribe el atributo `color`; con una
      etiqueta inexistente → aviso `Field 'color': Value … is not a valid option…`.
-8. Repetir **la misma petición** del paso 3 → `status: exists`, mismo `product_id`, sin cambios.
-9. Un `updateproduct` normal a un producto existente sigue funcionando igual que con la 1.26.0.
-10. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
+8. Precio 0: SKU nuevo con `"price": "0"` y `"status": "0"` → `status: created` sin avisos de
+   precio; en el admin el producto está **deshabilitado** con precio 0. El mismo con
+   `"status": "1"` (o sin `status`) → HTTP 422 `Field 'price' must be a positive number` y no se
+   crea nada. Con `"price": -1` y `"status": "0"` → 422.
+9. Repetir **la misma petición** del paso 3 → `status: exists`, mismo `product_id`, sin cambios.
+10. Un `updateproduct` normal a un producto existente sigue funcionando igual que con la 1.26.0
+    (también `"price": 0` sigue dando `Field 'price' must be a positive number`).
+11. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
 
 ## CLI Commands
 
