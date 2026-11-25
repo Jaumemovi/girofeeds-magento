@@ -6,14 +6,25 @@ namespace Girofeeds\ProductApi\Model\Update;
 
 class ValidationService
 {
+    /** Status values that mean "disabled" (CreateProduct::normalizeStatus returns 2 for them) */
+    const DISABLED_STATUSES = [2, '2', false, 'false', '0', 0];
 
-    public function validate(array $resolvedData): array
+    /**
+     * Validate resolved request data
+     *
+     * @param array $resolvedData
+     * @param bool $allowZeroPrice createproduct only (see allowsZeroPrice): a price equal to 0 is
+     *                             accepted; negative or non-numeric prices are still rejected
+     * @return array
+     */
+    public function validate(array $resolvedData, bool $allowZeroPrice = false): array
     {
         $errors = [];
 
         if (array_key_exists('price', $resolvedData)) {
             $price = $resolvedData['price'];
-            if (!is_numeric($price) || (float) $price <= 0) {
+            $isZero = is_numeric($price) && (float) $price == 0;
+            if (!is_numeric($price) || ((float) $price <= 0 && !($allowZeroPrice && $isZero))) {
                 $errors[] = "Field 'price' must be a positive number";
             }
         }
@@ -65,5 +76,19 @@ class ValidationService
         }
 
         return $errors;
+    }
+
+    /**
+     * createproduct (1.27.0): a price of 0 is allowed when the product is created disabled, i.e.
+     * the request's status is one of DISABLED_STATUSES. An absent status means enabled; an
+     * invalid status is not disabled (and fails validate()).
+     *
+     * @param array $resolvedData
+     * @return bool
+     */
+    public function allowsZeroPrice(array $resolvedData): bool
+    {
+        return array_key_exists('status', $resolvedData)
+            && in_array($resolvedData['status'], self::DISABLED_STATUSES, true);
     }
 }

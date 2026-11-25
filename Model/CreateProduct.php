@@ -359,7 +359,9 @@ class CreateProduct implements CreateProductInterface
                 }
             }
 
-            $validationErrors = $this->validationService->validate($resolved);
+            // Price 0 is accepted only for a product created disabled (1.27.0)
+            $allowZeroPrice = $this->validationService->allowsZeroPrice($resolved);
+            $validationErrors = $this->validationService->validate($resolved, $allowZeroPrice);
             if (!empty($validationErrors)) {
                 return $this->buildResponse('error', 'Validation failed', null, $sku, null, [], [], $validationErrors, null, 422);
             }
@@ -561,7 +563,14 @@ class CreateProduct implements CreateProductInterface
         $warnings = array_merge($warnings, $customResult['warnings']);
         $failedFields = array_merge($failedFields, $customResult['failed_fields']);
 
-        $warnings = array_merge($warnings, $this->priceUpdater->updatePrices($product, $resolved));
+        $warnings = array_merge(
+            $warnings,
+            $this->priceUpdater->updatePrices(
+                $product,
+                $resolved,
+                $this->validationService->allowsZeroPrice($resolved)
+            )
+        );
 
         // Images: base64 entries become data URIs for ImageUpdater (before the save)
         $creationFailed = 0;
