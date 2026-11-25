@@ -34,7 +34,15 @@ class StockUpdater
     public function updateStock(ProductInterface $product, array $resolvedData)
     {
         $warnings = [];
-        $stockFields = ['qty', 'is_in_stock', 'manage_stock', 'min_sale_qty', 'max_sale_qty', 'backorders'];
+        $stockFields = [
+            'qty',
+            'is_in_stock',
+            'use_config_manage_stock',
+            'manage_stock',
+            'min_sale_qty',
+            'max_sale_qty',
+            'backorders',
+        ];
         $hasStockUpdate = false;
 
         foreach ($stockFields as $field) {
@@ -62,6 +70,14 @@ class StockUpdater
         if (array_key_exists('is_in_stock', $resolvedData)) {
             $stockItem->setIsInStock(
                 in_array($resolvedData['is_in_stock'], [true, 1, '1', 'true'], true)
+            );
+        }
+
+        // Before manage_stock: manage_stock only takes effect with use_config_manage_stock = 0.
+        // Each field is independent (manage_stock alone does not change use_config_manage_stock).
+        if (array_key_exists('use_config_manage_stock', $resolvedData)) {
+            $stockItem->setUseConfigManageStock(
+                in_array($resolvedData['use_config_manage_stock'], [true, 1, '1', 'true'], true)
             );
         }
 

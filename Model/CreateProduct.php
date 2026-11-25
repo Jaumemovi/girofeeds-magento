@@ -8,6 +8,7 @@ use Girofeeds\ProductApi\Api\CreateProductInterface;
 use Girofeeds\ProductApi\Helper\General as GeneralHelper;
 use Girofeeds\ProductApi\Helper\Source as SourceHelper;
 use Girofeeds\ProductApi\Model\Create\CreationImages;
+use Girofeeds\ProductApi\Model\Create\CustomAttributeWriter;
 use Girofeeds\ProductApi\Model\Update\AttributeUpdater;
 use Girofeeds\ProductApi\Model\Update\CategoryUpdater;
 use Girofeeds\ProductApi\Model\Update\FieldProcessor;
@@ -34,6 +35,7 @@ use Magento\UrlRewrite\Model\Exception\UrlAlreadyExistsException;
  *
  * Reuses the updateproduct services (aliases, validation, select attributes, prices, categories,
  * images, stock). Idempotent by SKU and, when an EAN attribute is configured, by EAN.
+ * Any other request key that is a product attribute is written by CustomAttributeWriter (1.27.0).
  */
 class CreateProduct implements CreateProductInterface
 {
@@ -161,6 +163,11 @@ class CreateProduct implements CreateProductInterface
     private $productCollectionFactory;
 
     /**
+     * @var CustomAttributeWriter
+     */
+    private $customAttributeWriter;
+
+    /**
      * Constructor
      *
      * @param RequestInterface $request
@@ -187,6 +194,7 @@ class CreateProduct implements CreateProductInterface
      * @param FlatIndexerProcessor $flatIndexerProcessor
      * @param FulltextIndexerProcessor $fulltextIndexerProcessor
      * @param ProductCollectionFactory $productCollectionFactory
+     * @param CustomAttributeWriter $customAttributeWriter
      */
     public function __construct(
         RequestInterface $request,
@@ -212,7 +220,8 @@ class CreateProduct implements CreateProductInterface
         EavIndexerProcessor $eavIndexerProcessor,
         FlatIndexerProcessor $flatIndexerProcessor,
         FulltextIndexerProcessor $fulltextIndexerProcessor,
-        ProductCollectionFactory $productCollectionFactory
+        ProductCollectionFactory $productCollectionFactory,
+        CustomAttributeWriter $customAttributeWriter
     ) {
         $this->request = $request;
         $this->productFactory = $productFactory;
@@ -238,6 +247,7 @@ class CreateProduct implements CreateProductInterface
         $this->flatIndexerProcessor = $flatIndexerProcessor;
         $this->fulltextIndexerProcessor = $fulltextIndexerProcessor;
         $this->productCollectionFactory = $productCollectionFactory;
+        $this->customAttributeWriter = $customAttributeWriter;
     }
 
     /**
@@ -306,6 +316,8 @@ class CreateProduct implements CreateProductInterface
                 unset($data['images']);
             }
 
+            // Raw keys for the added attributes: resolveFields turns `manufacturer` into `brand`
+            $rawData = $data;
             $resolved = $this->fieldProcessor->resolveFields($data);
 
             $missing = [];
@@ -391,7 +403,15 @@ class CreateProduct implements CreateProductInterface
                     $warnings[] = 'url_key: collision, suffixed';
                 }
 
-                $build = $this->buildProduct($resolved, $images, $attributeSetId, $urlKey, $warnings, $failedFields);
+                $build = $this->buildProduct(
+                    $resolved,
+                    $rawData,
+                    $images,
+                    $attributeSetId,
+                    $urlKey,
+                    $warnings,
+                    $failedFields
+                );
                 /** @var \Magento\Catalog\Model\Product $product */
                 $product = $build['product'];
                 $imagesAdded = $build['images_added'];
@@ -467,6 +487,7 @@ class CreateProduct implements CreateProductInterface
      * New simple product at store 0 with every requested field, images and categories (not saved)
      *
      * @param array $resolved
+     * @param array $rawData request data before FieldProcessor::resolveFields (added attributes)
      * @param mixed $images raw `images` from the request, or null
      * @param int $attributeSetId
      * @param string $urlKey
@@ -476,6 +497,7 @@ class CreateProduct implements CreateProductInterface
      */
     private function buildProduct(
         array $resolved,
+        array $rawData,
         $images,
         int $attributeSetId,
         string $urlKey,
@@ -511,6 +533,12 @@ class CreateProduct implements CreateProductInterface
 
         $this->processIdentifierFields($product, $resolved);
         $this->processSelectAttributes($product, $resolved, $warnings, $failedFields);
+
+        // Added attributes (any other product attribute of the request), before prices so a
+        // requested special_from_date is kept by PriceUpdater
+        $customResult = $this->customAttributeWriter->write($product, $rawData, $attributeSetId);
+        $warnings = array_merge($warnings, $customResult['warnings']);
+        $failedFields = array_merge($failedFields, $customResult['failed_fields']);
 
         $warnings = array_merge($warnings, $this->priceUpdater->updatePrices($product, $resolved));
 
