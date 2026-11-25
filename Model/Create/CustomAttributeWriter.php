@@ -26,8 +26,12 @@ use Magento\Eav\Model\Config as EavConfig;
  *   type only warn
  * - written: codes set on the product, in request order
  *
+ * `color`, `size`, `material` and `gender` are reserved only while their Data > X field has a
+ * source attribute configured; without one they are written as their own attribute code.
+ *
  * Codes already handled by CreateProduct::processSelectAttributes in the request (the configured
- * source attribute of brand/color/size/material/gender) are skipped, so the 1.26.0 select step
+ * source attribute of brand/color/size/material/gender) or by processIdentifierFields (the
+ * Data > EAN attribute when `ean` arrives) are skipped, so the 1.26.0 select step
  * keeps precedence and each attribute has a single writer: with a warning when the request also
  * carried that select field explicitly, silently when the key only acted as its alias
  * (`manufacturer` alone becoming `brand`).
@@ -84,6 +88,21 @@ class CustomAttributeWriter
     ];
 
     /**
+     * Reserved select fields that become ordinary attribute codes when their Data > X field has
+     * no source attribute configured (the 1.26.0 select step does nothing with them then).
+     * `brand` is deliberately not here: it keeps its 1.26.0 behaviour in every configuration.
+     */
+    const RELEASABLE_SELECT_FIELDS = ['color', 'size', 'material', 'gender'];
+
+    /**
+     * Raw request keys that carry a handled field explicitly (FieldProcessor priority rules);
+     * any other field is carried only by its own name
+     */
+    const FIELD_REQUEST_KEYS = [
+        'ean' => ['ean', 'ean13', 'gtin'],
+    ];
+
+    /**
      * @var EavConfig
      */
     private $eavConfig;
@@ -129,10 +148,18 @@ class CustomAttributeWriter
      * @param array $data raw request data
      * @param int $attributeSetId attribute set of the new product
      * @param array $handledCodes attribute code => request field already handled by the select step
+     *                            or the identifier step (Data > EAN attribute => 'ean')
+     * @param array $selectSources select field => configured source attribute (Data > X; empty = none).
+     *                             Without an entry a field keeps its reservation.
      * @return array see the class docblock
      */
-    public function write($product, array $data, int $attributeSetId, array $handledCodes = []): array
-    {
+    public function write(
+        $product,
+        array $data,
+        int $attributeSetId,
+        array $handledCodes = [],
+        array $selectSources = []
+    ): array {
         $warnings = [];
         $failedFields = [];
         $written = [];
@@ -144,10 +171,18 @@ class CustomAttributeWriter
             $handled[strtolower((string) $handledCode)] = (string) $selectField;
         }
 
+        $released = [];
+        foreach (self::RELEASABLE_SELECT_FIELDS as $selectField) {
+            if (array_key_exists($selectField, $selectSources) && !$selectSources[$selectField]) {
+                $released[] = $selectField;
+            }
+        }
+
         foreach ($data as $key => $value) {
             $code = (string) $key;
             $lowerCode = strtolower($code);
-            if (in_array($lowerCode, self::RESERVED_KEYS, true) || $this->normalizer->isBlank($value)) {
+            $reserved = in_array($lowerCode, self::RESERVED_KEYS, true) && !in_array($lowerCode, $released, true);
+            if ($reserved || $this->normalizer->isBlank($value)) {
                 continue;
             }
 
@@ -159,7 +194,7 @@ class CustomAttributeWriter
 
                 if (array_key_exists($lowerCode, $handled)) {
                     $selectField = $handled[$lowerCode];
-                    if ($selectField !== $lowerCode && array_key_exists($selectField, $data)) {
+                    if ($selectField !== $lowerCode && $this->carriesField($data, $selectField, $lowerCode)) {
                         $warnings[] = "Field '{$code}' ignored: the attribute is handled by '{$selectField}'";
                     }
                     continue;
@@ -220,6 +255,28 @@ class CustomAttributeWriter
             'failed_fields' => array_values(array_unique($failedFields)),
             'written' => $written,
         ];
+    }
+
+    /**
+     * The raw request carries a handled field explicitly (by its own name or, for `ean`, one of
+     * its priority keys), other than the skipped code itself
+     *
+     * @param array $data
+     * @param string $field
+     * @param string $lowerCode
+     * @return bool
+     */
+    private function carriesField(array $data, string $field, string $lowerCode): bool
+    {
+        $fieldRequestKeys = self::FIELD_REQUEST_KEYS;
+        $requestKeys = array_key_exists($field, $fieldRequestKeys) ? $fieldRequestKeys[$field] : [$field];
+        foreach ($requestKeys as $requestKey) {
+            if ($requestKey !== $lowerCode && array_key_exists($requestKey, $data)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

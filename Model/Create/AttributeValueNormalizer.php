@@ -146,6 +146,44 @@ class AttributeValueNormalizer
     }
 
     /**
+     * Stock flags of a createproduct request (resolved data) with the yes/no rule of
+     * normalizeBoolean(), before StockUpdater (which only takes true/1/'1'/'true' as yes).
+     * A blank flag is dropped (as if not sent); an invalid one is dropped with a warning and
+     * reported as a failed field. Other keys are returned unchanged.
+     *
+     * @param array $resolved
+     * @param string[] $fields
+     * @return array ['resolved' => array, 'warnings' => string[], 'failed_fields' => string[]]
+     */
+    public function normalizeStockFlags(
+        array $resolved,
+        array $fields = ['use_config_manage_stock', 'manage_stock']
+    ): array {
+        $warnings = [];
+        $failedFields = [];
+        foreach ($fields as $field) {
+            if (!array_key_exists($field, $resolved)) {
+                continue;
+            }
+            $value = $resolved[$field];
+            if ($this->isBlank($value)) {
+                unset($resolved[$field]);
+                continue;
+            }
+            $result = $this->normalizeBoolean($field, $value);
+            if ($result['write']) {
+                $resolved[$field] = $result['value'];
+                continue;
+            }
+            unset($resolved[$field]);
+            $warnings[] = "Field '{$field}' ignored: invalid boolean value";
+            $failedFields[] = $field;
+        }
+
+        return ['resolved' => $resolved, 'warnings' => $warnings, 'failed_fields' => $failedFields];
+    }
+
+    /**
      * Option id of a select value (label first, then exact option id). Options are never created.
      *
      * @param string $code
