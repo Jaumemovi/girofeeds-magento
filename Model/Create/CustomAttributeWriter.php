@@ -137,22 +137,30 @@ class CustomAttributeWriter
         $failedFields = [];
         $written = [];
 
+        // Reserved, blocked and handled codes are matched case-insensitively (Magento resolves
+        // attribute codes case-insensitively on lookup and save)
+        $handled = [];
+        foreach ($handledCodes as $handledCode => $selectField) {
+            $handled[strtolower((string) $handledCode)] = (string) $selectField;
+        }
+
         foreach ($data as $key => $value) {
             $code = (string) $key;
-            if (in_array($code, self::RESERVED_KEYS, true) || $this->normalizer->isBlank($value)) {
+            $lowerCode = strtolower($code);
+            if (in_array($lowerCode, self::RESERVED_KEYS, true) || $this->normalizer->isBlank($value)) {
                 continue;
             }
 
             try {
-                if (in_array($code, self::BLOCKED_ATTRIBUTES, true)) {
+                if (in_array($lowerCode, self::BLOCKED_ATTRIBUTES, true)) {
                     $warnings[] = "Field '{$code}' ignored: attribute not allowed";
                     continue;
                 }
 
-                if (array_key_exists($code, $handledCodes)) {
-                    $selectField = (string) $handledCodes[$code];
-                    if ($selectField !== $code && array_key_exists($selectField, $data)) {
-                        $warnings[] = "Field '{$code}' ignored: the attribute is already written by '{$selectField}'";
+                if (array_key_exists($lowerCode, $handled)) {
+                    $selectField = $handled[$lowerCode];
+                    if ($selectField !== $lowerCode && array_key_exists($selectField, $data)) {
+                        $warnings[] = "Field '{$code}' ignored: the attribute is handled by '{$selectField}'";
                     }
                     continue;
                 }
