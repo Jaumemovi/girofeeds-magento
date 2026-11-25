@@ -632,7 +632,10 @@ acabar.
    `create_custom_attributes` (además de `createproduct`).
 3. Abrir **Stores > Configuration > Girofeeds > Product Feed** → la sección se muestra entera
    (antes salía vacía), con **Product Data Settings**. Elegir en **EAN / GTIN** el atributo de EAN
-   de la tienda (lacoop: `gtin`), guardar y limpiar la caché de configuración. Después, crear un
+   de la tienda (lacoop: `gtin`) con el selector de ámbito en **Default Config**, guardar y limpiar
+   la caché de configuración. El valor se lee para la tienda en la que se ejecuta la petición de
+   creación, así que con escritura en todas las vistas (la opción por defecto) solo cuenta el de
+   Default Config y uno guardado solo en una vista de tienda se ignora. Después, crear un
    producto con SKU nuevo y `"ean": "<EAN de prueba>"` → `status: created`; en el admin (All Store
    Views) el atributo elegido tiene ese EAN. Repetir la petición con otro SKU y el mismo `ean` →
    `status: exists` con el `product_id` anterior (idempotencia por EAN).
