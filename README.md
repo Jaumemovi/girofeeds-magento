@@ -491,6 +491,28 @@ attributes (list: `CustomAttributeWriter::RESERVED_KEYS`).
 `manufacturer` is not reserved: as in 1.26.0 it is the `brand` alias when `brand` is not sent,
 and it is also written to the `manufacturer` attribute when that attribute exists.
 
+**One writer per attribute; the select step keeps precedence.** The attributes configured as
+source of `brand`, `color`, `size`, `material` and `gender` (**Data > Brand**, …) are written only
+by the 1.26.0 select step whenever that field is in the request (written or failed). A raw key
+equal to one of those attribute codes is then skipped:
+
+- with the warning `Field '<code>' ignored: the attribute is already written by '<field>'` (not
+  a failed field) when the request also carries the select field itself, e.g. `brand` and
+  `manufacturer` with **Data > Brand** = `manufacturer` (the attribute takes the `brand` value,
+  as in 1.26.0);
+- silently when the key only acted as the alias: `manufacturer` alone becomes `brand`, and the
+  select step's result (written, or `Field 'brand': …` warning) is the only message, exactly as
+  in 1.26.0. In that configuration `manufacturer` is matched **by admin label only**, as `brand`
+  always was; an option id is not accepted.
+
+With any other **Data > Brand** attribute (or none), `manufacturer` is written by the generic
+writer as described below (label or option id), and `brand` goes to the configured attribute.
+
+**Attributes never written** (`CustomAttributeWriter::BLOCKED_ATTRIBUTES`): `custom_layout_update`,
+`custom_layout_update_file`, `custom_layout`, `custom_design`, `custom_design_from`,
+`custom_design_to`, `page_layout`, `options_container`. A non-blank value only produces the
+warning `Field '<code>' ignored: attribute not allowed` (not a failed field).
+
 ```json
 {
   "sku": "GF-0002",
@@ -512,10 +534,11 @@ field is skipped and the response carries a warning; invalid values also go to `
 |-----------|----------------|
 | `select` | option label (case-insensitive, trimmed, admin labels) or else the exact option id. Options are **never created**; otherwise the warning lists the available labels (at most 50, then `…`) |
 | `multiselect` | list or comma-separated string; each element as in `select`; the valid ones are written and each invalid one warns |
-| `boolean` (Yes/No) | yes: `true`, `1`, `'1'`, `'true'`, `'yes'`, `'si'`, `'sí'`; no: `false`, `0`, `'0'`, `'false'`, `'no'` (case-insensitive) |
-| numeric (`decimal`/`int` backend, not a list or Yes/No) | a number or numeric string (`12.5`; `12,5` is rejected) |
-| `date` / `datetime` | a string `strtotime()` understands (`2026-11-25`, `2026-11-25 10:00:00`) |
-| text and the rest | any scalar, written as a string; a list or object is rejected |
+| `boolean` (Yes/No input) | yes: `true`, `1`, `'1'`, `'true'`, `'yes'`, `'si'`, `'sí'`; no: `false`, `0`, `'0'`, `'false'`, `'no'` (case-insensitive) |
+| Yes/No dropdown (`select` with a boolean source) | treated as `select`: the option label as shown in admin (`Yes`/`No`, or the translated label) or the option id (`1`/`0`); `true`/`si` are not accepted |
+| numeric (`decimal`/`int` backend, not a list or Yes/No) | a finite number or numeric string (`12.5`; `12,5` and `1e400` are rejected) |
+| `date` / `datetime` | only `Y-m-d`, `Y-m-d H:i`, `Y-m-d H:i:s` and ISO 8601 `Y-m-dTH:i[:s]` with optional `Z` or offset (`+01:00`, `-0530`), with a real calendar date and valid time. Written as `Y-m-d` or `Y-m-d H:i:s` (the time as sent; the `Z`/offset is checked and dropped). Anything else is rejected: digits only (`20261201`), `01/12/2026`, `12/01/2026`, words (`tomorrow`), integers, `2026-02-30` |
+| text and the rest | any scalar, written as a string; a list or object is rejected. With backend `varchar`, at most **255 characters** (otherwise `Field '<code>' ignored: value longer than 255 characters`, failed field); backend `text` is unlimited |
 
 - `null` or an empty string: not written, no warning.
 - Not a product attribute: `Field '<code>' ignored: not a product attribute`.
@@ -570,14 +593,19 @@ acabar.
 
 2. `GET /rest/all/V1/girofeeds/test?key=<key>` → `version` 1.27.0 y `capabilities` incluye
    `create_custom_attributes` (además de `createproduct`).
-3. En el admin, anotar el tipo de `am_shipping_type`, `availability`, `mpn` y `manufacturer`
-   (**Stores > Attributes > Product**) y comprobar que están en el conjunto de atributos con el
-   que se crea (por defecto el de **Product Creation**). Crear un producto con los seis campos
-   de lacoop: `am_shipping_type` (etiqueta de una opción existente), `availability`, `mpn`,
-   `manufacturer` (etiqueta existente), `use_config_manage_stock: 0` y `manage_stock: 0` →
+3. En el admin, anotar el atributo de **Stores > Configuration > Girofeeds > Data > Brand** (en
+   adelante «atributo de marca») y el tipo de `am_shipping_type`, `availability`, `mpn` y
+   `manufacturer` (**Stores > Attributes > Product**), y comprobar que están en el conjunto de
+   atributos con el que se crea (por defecto el de **Product Creation**). Elegir para
+   `manufacturer` una **etiqueta** que exista como opción de `manufacturer` y también del
+   atributo de marca (si es otro atributo). Crear un producto con los seis campos de lacoop:
+   `am_shipping_type` (etiqueta de una opción existente), `availability`, `mpn`, `manufacturer`
+   (esa etiqueta), `use_config_manage_stock: 0` y `manage_stock: 0`, **sin** `brand` →
    `status: created`, `warnings` vacío. En el admin (All Store Views): los cuatro atributos con
-   el valor enviado (las listas con la opción elegida) y, en **Advanced Inventory**, «Manage
-   Stock» = No con «Use Config Settings» desmarcado.
+   el valor enviado (las listas con la opción elegida), el atributo de marca con esa misma
+   etiqueta y, en **Advanced Inventory**, «Manage Stock» = No con «Use Config Settings»
+   desmarcado. (Si el atributo de marca no tiene esa etiqueta, el producto se crea igual con
+   `manufacturer` escrito y el aviso `Field 'brand': …`, como en la 1.26.0.)
 4. Igual que el paso 3 pero con `"am_shipping_type": "NoExiste"` → `status: created`, aviso
    `Field 'am_shipping_type': Value 'NoExiste' is not a valid option … Available options: …`,
    `failed_fields` con `am_shipping_type`; el producto se crea sin ese valor y no aparece ninguna
@@ -588,11 +616,19 @@ acabar.
    valor efectivo es el de la configuración). SKU nuevo con `"use_config_manage_stock": 0` y
    `"manage_stock": 1` → «Manage Stock» = Sí con «Use Config Settings» desmarcado. Con
    `updateproduct`, enviar `"use_config_manage_stock": 1` a uno de ellos → vuelve a marcarse.
-7. `manufacturer` y `brand`: SKU nuevo con `"brand": "<etiqueta A>"` y
-   `"manufacturer": "<etiqueta B>"` → el atributo `manufacturer` queda con B; el atributo de
-   marca configurado en **Data > Brand** queda con A (si es el propio `manufacturer`, queda B).
-   SKU nuevo solo con `"manufacturer": "<etiqueta A>"` → la marca configurada queda con A, como
-   en la 1.26.0.
+7. `manufacturer` y `brand` (A y B, etiquetas existentes de `manufacturer`):
+   - SKU nuevo con `"brand": "A"` y `"manufacturer": "B"`. Si el atributo de marca es
+     `manufacturer` → `manufacturer` = A y aviso
+     `Field 'manufacturer' ignored: the attribute is already written by 'brand'` (sin
+     `failed_fields`). Si es otro atributo → `manufacturer` = B, el atributo de marca = A y sin
+     ese aviso. Si no hay atributo de marca configurado → `manufacturer` = B.
+   - SKU nuevo solo con `"manufacturer": "A"` → el atributo de marca (sea cual sea) queda con A,
+     como en la 1.26.0; si es otro atributo, `manufacturer` también = A. Ningún aviso nuevo.
+   - Si el atributo de marca es `manufacturer`: SKU nuevo solo con `"manufacturer": "<id de la
+     opción A>"` → aviso `Field 'brand': Value '<id>' is not a valid option…` y `failed_fields`
+     con `brand`, igual que en la 1.26.0 (en esa configuración solo vale la etiqueta).
+   - SKU nuevo con `"custom_layout_update": "<x/>"` → aviso
+     `Field 'custom_layout_update' ignored: attribute not allowed` y el campo vacío en el admin.
 8. Repetir **la misma petición** del paso 3 → `status: exists`, mismo `product_id`, sin cambios.
 9. Un `updateproduct` normal a un producto existente sigue funcionando igual que con la 1.26.0.
 10. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
