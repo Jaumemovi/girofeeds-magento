@@ -496,7 +496,7 @@ source of `brand`, `color`, `size`, `material` and `gender` (**Data > Brand**, �
 by the 1.26.0 select step whenever that field is in the request (written or failed). A raw key
 equal to one of those attribute codes is then skipped:
 
-- with the warning `Field '<code>' ignored: the attribute is already written by '<field>'` (not
+- with the warning `Field '<code>' ignored: the attribute is handled by '<field>'` (not
   a failed field) when the request also carries the select field itself, e.g. `brand` and
   `manufacturer` with **Data > Brand** = `manufacturer` (the attribute takes the `brand` value,
   as in 1.26.0);
@@ -512,6 +512,9 @@ writer as described below (label or option id), and `brand` goes to the configur
 `custom_layout_update_file`, `custom_layout`, `custom_design`, `custom_design_from`,
 `custom_design_to`, `page_layout`, `options_container`. A non-blank value only produces the
 warning `Field '<code>' ignored: attribute not allowed` (not a failed field).
+
+Reserved keys, blocked attributes and the codes handled by the select step are matched
+regardless of case (`Price`, `Custom_Layout_Update`, `Manufacturer`).
 
 ```json
 {
@@ -605,7 +608,8 @@ acabar.
    el valor enviado (las listas con la opción elegida), el atributo de marca con esa misma
    etiqueta y, en **Advanced Inventory**, «Manage Stock» = No con «Use Config Settings»
    desmarcado. (Si el atributo de marca no tiene esa etiqueta, el producto se crea igual con
-   `manufacturer` escrito y el aviso `Field 'brand': …`, como en la 1.26.0.)
+   `manufacturer` escrito y el aviso `Field 'brand': …`, como en la 1.26.0. Si no hay atributo
+   de marca configurado, solo se comprueba `manufacturer`, y `warnings` queda vacío.)
 4. Igual que el paso 3 pero con `"am_shipping_type": "NoExiste"` → `status: created`, aviso
    `Field 'am_shipping_type': Value 'NoExiste' is not a valid option … Available options: …`,
    `failed_fields` con `am_shipping_type`; el producto se crea sin ese valor y no aparece ninguna
@@ -619,7 +623,7 @@ acabar.
 7. `manufacturer` y `brand` (A y B, etiquetas existentes de `manufacturer`):
    - SKU nuevo con `"brand": "A"` y `"manufacturer": "B"`. Si el atributo de marca es
      `manufacturer` → `manufacturer` = A y aviso
-     `Field 'manufacturer' ignored: the attribute is already written by 'brand'` (sin
+     `Field 'manufacturer' ignored: the attribute is handled by 'brand'` (sin
      `failed_fields`). Si es otro atributo → `manufacturer` = B, el atributo de marca = A y sin
      ese aviso. Si no hay atributo de marca configurado → `manufacturer` = B.
    - SKU nuevo solo con `"manufacturer": "A"` → el atributo de marca (sea cual sea) queda con A,
