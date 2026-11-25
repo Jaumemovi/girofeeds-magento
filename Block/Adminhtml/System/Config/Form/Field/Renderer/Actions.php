@@ -65,7 +65,11 @@ class Actions extends Select
         if (!$this->options) {
             $this->options[] = ['value' => '', 'label' => ''];
             $this->options[] = $this->getFormatOptions();
-            $this->options[] = $this->getPriceOptions();
+            // No currency group when the store cannot be resolved (an empty entry has no value/label)
+            $priceOptions = $this->getPriceOptions();
+            if (!empty($priceOptions)) {
+                $this->options[] = $priceOptions;
+            }
         }
 
         return $this->options;
