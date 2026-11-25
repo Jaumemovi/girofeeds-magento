@@ -31,6 +31,15 @@ class AttributeValueNormalizer
     const TRUE_VALUES = ['true', '1', 'yes', 'si', 'sí'];
     const FALSE_VALUES = ['false', '0', 'no'];
 
+    /** Maximum length of a value for a `varchar` backend attribute (MySQL would truncate it) */
+    const MAX_VARCHAR_LENGTH = 255;
+
+    /**
+     * Accepted dates: Y-m-d, Y-m-d H:i[:s], and ISO 8601 Y-m-d\TH:i[:s] with optional Z/offset.
+     * Groups: 1 year, 2 month, 3 day, 4 hour, 5 minute, 6 second, 7 zone (T form only).
+     */
+    const DATE_PATTERN = '/^(\d{4})-(\d{2})-(\d{2})(?:(?: (\d{2}):(\d{2})(?::(\d{2}))?)|(?:T(\d{2}):(\d{2})(?::(\d{2}))?(Z|[+-]\d{2}:?\d{2})?))?$/';
+
     /** Frontend inputs that are never written by the generic writer */
     const UNSUPPORTED_INPUTS = ['media_image', 'gallery', 'weee'];
 
@@ -86,9 +95,10 @@ class AttributeValueNormalizer
      * @param string $kind one of the KIND_* constants except KIND_UNSUPPORTED
      * @param mixed $value
      * @param array $options [['value' => ..., 'label' => ...]] for select/multiselect
+     * @param string $backendType attribute backend type (text length limit for `varchar`)
      * @return array see the class docblock
      */
-    public function normalize(string $code, string $kind, $value, array $options = []): array
+    public function normalize(string $code, string $kind, $value, array $options = [], string $backendType = ''): array
     {
         if ($this->isBlank($value)) {
             return $this->skip();
@@ -106,7 +116,7 @@ class AttributeValueNormalizer
             case self::KIND_DATE:
                 return $this->normalizeDate($code, $value);
             default:
-                return $this->normalizeText($code, $value);
+                return $this->normalizeText($code, $value, $backendType);
         }
     }
 
@@ -223,10 +233,10 @@ class AttributeValueNormalizer
      */
     public function normalizeNumeric(string $code, $value): array
     {
-        if (is_int($value) || is_float($value)) {
+        if (is_int($value) || (is_float($value) && is_finite($value))) {
             return $this->accept($value);
         }
-        if (is_string($value) && is_numeric(trim($value))) {
+        if (is_string($value) && is_numeric(trim($value)) && is_finite((float) trim($value))) {
             return $this->accept(trim($value));
         }
 
@@ -234,7 +244,11 @@ class AttributeValueNormalizer
     }
 
     /**
-     * Date or date-time string that strtotime() understands (written as received, trimmed)
+     * Date (Y-m-d) or date-time (Y-m-d H:i[:s], or ISO 8601 Y-m-d\TH:i[:s] with optional Z or
+     * offset), checked with checkdate() and valid time ranges. Written as `Y-m-d` or
+     * `Y-m-d H:i:s` (the wall-clock time as sent; a Z/offset is validated and dropped). Anything
+     * else (digits only, d/m/Y, m/d/Y, words, integers) is rejected: Magento's datetime backend
+     * would read it as something else.
      *
      * @param string $code
      * @param mixed $value
@@ -242,10 +256,10 @@ class AttributeValueNormalizer
      */
     public function normalizeDate(string $code, $value): array
     {
-        if (is_scalar($value) && !is_bool($value)) {
-            $text = trim((string) $value);
-            if ($text !== '' && strtotime($text) !== false && $this->isRealDate($text)) {
-                return $this->accept($text);
+        if (is_string($value)) {
+            $formatted = $this->formatDate(trim($value));
+            if ($formatted !== null) {
+                return $this->accept($formatted);
             }
         }
 
@@ -255,17 +269,31 @@ class AttributeValueNormalizer
     /**
      * Any scalar as a string; lists and objects are rejected
      *
+     * A `varchar` attribute takes at most MAX_VARCHAR_LENGTH characters; `text` is unlimited.
+     *
      * @param string $code
      * @param mixed $value
+     * @param string $backendType
      * @return array
      */
-    public function normalizeText(string $code, $value): array
+    public function normalizeText(string $code, $value, string $backendType = ''): array
     {
         if (!is_scalar($value)) {
             return $this->reject($code, 'value must be text, received ' . $this->describe($value));
         }
 
-        return $this->accept($this->scalarToString($value));
+        $text = $this->scalarToString($value);
+        $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+        if ($backendType === 'varchar' && $length > self::MAX_VARCHAR_LENGTH) {
+            return [
+                'write' => false,
+                'value' => null,
+                'warnings' => ["Field '{$code}' ignored: value longer than " . self::MAX_VARCHAR_LENGTH . ' characters'],
+                'failed' => true,
+            ];
+        }
+
+        return $this->accept($text);
     }
 
     /**
@@ -353,19 +381,52 @@ class AttributeValueNormalizer
     }
 
     /**
-     * strtotime() accepts overflowing dates such as 2026-13-45; reject them when the value
-     * starts with a Y-m-d date
+     * `Y-m-d` / `Y-m-d H:i:s` for an accepted date string, or null
      *
      * @param string $text
-     * @return bool
+     * @return string|null
      */
-    private function isRealDate(string $text): bool
+    private function formatDate(string $text)
     {
-        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})/', $text, $matches)) {
-            return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
+        if (!preg_match(self::DATE_PATTERN, $text, $matches)) {
+            return null;
         }
 
-        return true;
+        $year = (int) $matches[1];
+        $month = (int) $matches[2];
+        $day = (int) $matches[3];
+        if (!checkdate($month, $day, $year)) {
+            return null;
+        }
+
+        $hour = null;
+        $minute = 0;
+        $second = 0;
+        if (isset($matches[4]) && $matches[4] !== '') {
+            $hour = (int) $matches[4];
+            $minute = (int) $matches[5];
+            $second = isset($matches[6]) && $matches[6] !== '' ? (int) $matches[6] : 0;
+        } elseif (isset($matches[7]) && $matches[7] !== '') {
+            $hour = (int) $matches[7];
+            $minute = (int) $matches[8];
+            $second = isset($matches[9]) && $matches[9] !== '' ? (int) $matches[9] : 0;
+            if (isset($matches[10]) && $matches[10] !== '' && $matches[10] !== 'Z') {
+                $offset = str_replace(':', '', substr($matches[10], 1));
+                if ((int) substr($offset, 0, 2) > 14 || (int) substr($offset, 2, 2) > 59) {
+                    return null;
+                }
+            }
+        }
+
+        $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
+        if ($hour === null) {
+            return $date;
+        }
+        if ($hour > 23 || $minute > 59 || $second > 59) {
+            return null;
+        }
+
+        return $date . sprintf(' %02d:%02d:%02d', $hour, $minute, $second);
     }
 
     /**

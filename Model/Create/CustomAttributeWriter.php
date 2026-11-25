@@ -25,6 +25,12 @@ use Magento\Eav\Model\Config as EavConfig;
  *   written and was not); keys that are not attributes, not in the set or of an unsupported
  *   type only warn
  * - written: codes set on the product, in request order
+ *
+ * Codes already handled by CreateProduct::processSelectAttributes in the request (the configured
+ * source attribute of brand/color/size/material/gender) are skipped, so the 1.26.0 select step
+ * keeps precedence and each attribute has a single writer: with a warning when the request also
+ * carried that select field explicitly, silently when the key only acted as its alias
+ * (`manufacturer` alone becoming `brand`).
  */
 class CustomAttributeWriter
 {
@@ -65,6 +71,16 @@ class CustomAttributeWriter
         // System data of the product model (`id` is the model's alias of entity_id)
         'id', 'entity_id', 'attribute_set_id', 'type_id', 'created_at', 'updated_at', 'has_options',
         'required_options', 'media_gallery', 'gallery', 'tier_price', 'quantity_and_stock_status',
+    ];
+
+    /**
+     * Attributes the generic writer never writes, even when they exist and are in the set:
+     * layout XML and design settings (per-product layout updates are a code execution vector
+     * in Magento 2.3) and page layout / options container. A non-blank value only warns.
+     */
+    const BLOCKED_ATTRIBUTES = [
+        'custom_layout_update', 'custom_layout_update_file', 'custom_layout', 'custom_design',
+        'custom_design_from', 'custom_design_to', 'page_layout', 'options_container',
     ];
 
     /**
@@ -112,9 +128,10 @@ class CustomAttributeWriter
      * @param \Magento\Catalog\Model\Product $product
      * @param array $data raw request data
      * @param int $attributeSetId attribute set of the new product
+     * @param array $handledCodes attribute code => request field already handled by the select step
      * @return array see the class docblock
      */
-    public function write($product, array $data, int $attributeSetId): array
+    public function write($product, array $data, int $attributeSetId, array $handledCodes = []): array
     {
         $warnings = [];
         $failedFields = [];
@@ -127,6 +144,19 @@ class CustomAttributeWriter
             }
 
             try {
+                if (in_array($code, self::BLOCKED_ATTRIBUTES, true)) {
+                    $warnings[] = "Field '{$code}' ignored: attribute not allowed";
+                    continue;
+                }
+
+                if (array_key_exists($code, $handledCodes)) {
+                    $selectField = (string) $handledCodes[$code];
+                    if ($selectField !== $code && array_key_exists($selectField, $data)) {
+                        $warnings[] = "Field '{$code}' ignored: the attribute is already written by '{$selectField}'";
+                    }
+                    continue;
+                }
+
                 if (!preg_match(self::CODE_PATTERN, $code)) {
                     $warnings[] = "Field '{$code}' ignored: not a product attribute";
                     continue;
@@ -160,7 +190,7 @@ class CustomAttributeWriter
                     $options = $this->getAdminOptions($attribute);
                 }
 
-                $result = $this->normalizer->normalize($code, $kind, $value, $options);
+                $result = $this->normalizer->normalize($code, $kind, $value, $options, $backendType);
                 foreach ($result['warnings'] as $warning) {
                     $warnings[] = $warning;
                 }

@@ -532,11 +532,17 @@ class CreateProduct implements CreateProductInterface
         $product->setUrlKey($urlKey);
 
         $this->processIdentifierFields($product, $resolved);
-        $this->processSelectAttributes($product, $resolved, $warnings, $failedFields);
+        $selectHandledCodes = $this->processSelectAttributes($product, $resolved, $warnings, $failedFields);
 
         // Added attributes (any other product attribute of the request), before prices so a
-        // requested special_from_date is kept by PriceUpdater
-        $customResult = $this->customAttributeWriter->write($product, $rawData, $attributeSetId);
+        // requested special_from_date is kept by PriceUpdater. The attributes the select step
+        // handled are left to it (1.26.0 precedence).
+        $customResult = $this->customAttributeWriter->write(
+            $product,
+            $rawData,
+            $attributeSetId,
+            $selectHandledCodes
+        );
         $warnings = array_merge($warnings, $customResult['warnings']);
         $failedFields = array_merge($failedFields, $customResult['failed_fields']);
 
@@ -996,10 +1002,12 @@ class CreateProduct implements CreateProductInterface
      * @param array $resolved
      * @param array $warnings
      * @param array $failedFields
-     * @return void
+     * @return array configured attribute code => request field, for every select field present in
+     *               $resolved with a configured source attribute (written or failed)
      */
     private function processSelectAttributes($product, array $resolved, array &$warnings, array &$failedFields)
     {
+        $handledCodes = [];
         $selectFields = [
             'color'    => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_COLOR_SOURCE),
             'size'     => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_SIZE_SOURCE),
@@ -1011,6 +1019,9 @@ class CreateProduct implements CreateProductInterface
         foreach ($selectFields as $requestField => $magentoAttribute) {
             if (!array_key_exists($requestField, $resolved) || !$magentoAttribute) {
                 continue;
+            }
+            if (!array_key_exists((string) $magentoAttribute, $handledCodes)) {
+                $handledCodes[(string) $magentoAttribute] = $requestField;
             }
             $value = $resolved[$requestField];
             if (!is_scalar($value) || trim((string) $value) === '') {
@@ -1028,6 +1039,8 @@ class CreateProduct implements CreateProductInterface
                 $failedFields[] = $requestField;
             }
         }
+
+        return $handledCodes;
     }
 
     /**
