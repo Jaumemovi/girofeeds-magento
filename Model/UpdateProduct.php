@@ -401,7 +401,16 @@ class UpdateProduct implements UpdateProductInterface
 
             $stockWarnings = $this->stockUpdater->updateStock($product, $resolved);
             $warnings = array_merge($warnings, $stockWarnings);
-            foreach (['qty', 'is_in_stock', 'manage_stock', 'min_sale_qty', 'max_sale_qty', 'backorders'] as $sf) {
+            $stockFields = [
+                'qty',
+                'is_in_stock',
+                'use_config_manage_stock',
+                'manage_stock',
+                'min_sale_qty',
+                'max_sale_qty',
+                'backorders',
+            ];
+            foreach ($stockFields as $sf) {
                 if (array_key_exists($sf, $resolved)) {
                     $updatedFields[] = $sf;
                 }

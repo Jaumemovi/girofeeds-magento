@@ -133,7 +133,7 @@ class Test implements TestInterface
                 'extra_mapped_fields' => $extraMappedFields,
                 'write_scope' => $this->generalHelper->getWriteScope(),
                 'write_scope_capability' => true,
-                'capabilities' => ['updateproduct', 'createproduct', 'scope_repair'],
+                'capabilities' => ['updateproduct', 'createproduct', 'scope_repair', 'create_custom_attributes'],
                 'create_defaults' => [
                     'attribute_set_id' => $this->generalHelper->getCreateAttributeSetId(),
                     'website_ids' => $this->generalHelper->getCreateWebsiteIds(),

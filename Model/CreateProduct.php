@@ -8,6 +8,8 @@ use Girofeeds\ProductApi\Api\CreateProductInterface;
 use Girofeeds\ProductApi\Helper\General as GeneralHelper;
 use Girofeeds\ProductApi\Helper\Source as SourceHelper;
 use Girofeeds\ProductApi\Model\Create\CreationImages;
+use Girofeeds\ProductApi\Model\Create\AttributeValueNormalizer;
+use Girofeeds\ProductApi\Model\Create\CustomAttributeWriter;
 use Girofeeds\ProductApi\Model\Update\AttributeUpdater;
 use Girofeeds\ProductApi\Model\Update\CategoryUpdater;
 use Girofeeds\ProductApi\Model\Update\FieldProcessor;
@@ -34,6 +36,7 @@ use Magento\UrlRewrite\Model\Exception\UrlAlreadyExistsException;
  *
  * Reuses the updateproduct services (aliases, validation, select attributes, prices, categories,
  * images, stock). Idempotent by SKU and, when an EAN attribute is configured, by EAN.
+ * Any other request key that is a product attribute is written by CustomAttributeWriter (1.27.0).
  */
 class CreateProduct implements CreateProductInterface
 {
@@ -161,6 +164,16 @@ class CreateProduct implements CreateProductInterface
     private $productCollectionFactory;
 
     /**
+     * @var CustomAttributeWriter
+     */
+    private $customAttributeWriter;
+
+    /**
+     * @var AttributeValueNormalizer
+     */
+    private $attributeValueNormalizer;
+
+    /**
      * Constructor
      *
      * @param RequestInterface $request
@@ -187,6 +200,8 @@ class CreateProduct implements CreateProductInterface
      * @param FlatIndexerProcessor $flatIndexerProcessor
      * @param FulltextIndexerProcessor $fulltextIndexerProcessor
      * @param ProductCollectionFactory $productCollectionFactory
+     * @param CustomAttributeWriter $customAttributeWriter
+     * @param AttributeValueNormalizer $attributeValueNormalizer
      */
     public function __construct(
         RequestInterface $request,
@@ -212,7 +227,9 @@ class CreateProduct implements CreateProductInterface
         EavIndexerProcessor $eavIndexerProcessor,
         FlatIndexerProcessor $flatIndexerProcessor,
         FulltextIndexerProcessor $fulltextIndexerProcessor,
-        ProductCollectionFactory $productCollectionFactory
+        ProductCollectionFactory $productCollectionFactory,
+        CustomAttributeWriter $customAttributeWriter,
+        AttributeValueNormalizer $attributeValueNormalizer
     ) {
         $this->request = $request;
         $this->productFactory = $productFactory;
@@ -238,6 +255,8 @@ class CreateProduct implements CreateProductInterface
         $this->flatIndexerProcessor = $flatIndexerProcessor;
         $this->fulltextIndexerProcessor = $fulltextIndexerProcessor;
         $this->productCollectionFactory = $productCollectionFactory;
+        $this->customAttributeWriter = $customAttributeWriter;
+        $this->attributeValueNormalizer = $attributeValueNormalizer;
     }
 
     /**
@@ -306,6 +325,8 @@ class CreateProduct implements CreateProductInterface
                 unset($data['images']);
             }
 
+            // Raw keys for the added attributes: resolveFields turns `manufacturer` into `brand`
+            $rawData = $data;
             $resolved = $this->fieldProcessor->resolveFields($data);
 
             $missing = [];
@@ -338,7 +359,9 @@ class CreateProduct implements CreateProductInterface
                 }
             }
 
-            $validationErrors = $this->validationService->validate($resolved);
+            // Price 0 is accepted only for a product created disabled (1.27.0)
+            $allowZeroPrice = $this->validationService->allowsZeroPrice($resolved);
+            $validationErrors = $this->validationService->validate($resolved, $allowZeroPrice);
             if (!empty($validationErrors)) {
                 return $this->buildResponse('error', 'Validation failed', null, $sku, null, [], [], $validationErrors, null, 422);
             }
@@ -391,7 +414,15 @@ class CreateProduct implements CreateProductInterface
                     $warnings[] = 'url_key: collision, suffixed';
                 }
 
-                $build = $this->buildProduct($resolved, $images, $attributeSetId, $urlKey, $warnings, $failedFields);
+                $build = $this->buildProduct(
+                    $resolved,
+                    $rawData,
+                    $images,
+                    $attributeSetId,
+                    $urlKey,
+                    $warnings,
+                    $failedFields
+                );
                 /** @var \Magento\Catalog\Model\Product $product */
                 $product = $build['product'];
                 $imagesAdded = $build['images_added'];
@@ -419,7 +450,12 @@ class CreateProduct implements CreateProductInterface
 
             $productId = (int) $product->getId();
 
-            // Stock after the save (the stock item needs the product id)
+            // Stock after the save (the stock item needs the product id). The two manage-stock
+            // flags take the yes/no rule of the added attributes (create only; StockUpdater is shared)
+            $stockFlags = $this->attributeValueNormalizer->normalizeStockFlags($resolved);
+            $resolved = $stockFlags['resolved'];
+            $warnings = array_merge($warnings, $stockFlags['warnings']);
+            $failedFields = array_merge($failedFields, $stockFlags['failed_fields']);
             if (!array_key_exists('qty', $resolved)) {
                 $resolved['qty'] = 0;
             }
@@ -467,6 +503,7 @@ class CreateProduct implements CreateProductInterface
      * New simple product at store 0 with every requested field, images and categories (not saved)
      *
      * @param array $resolved
+     * @param array $rawData request data before FieldProcessor::resolveFields (added attributes)
      * @param mixed $images raw `images` from the request, or null
      * @param int $attributeSetId
      * @param string $urlKey
@@ -476,6 +513,7 @@ class CreateProduct implements CreateProductInterface
      */
     private function buildProduct(
         array $resolved,
+        array $rawData,
         $images,
         int $attributeSetId,
         string $urlKey,
@@ -509,10 +547,30 @@ class CreateProduct implements CreateProductInterface
         }
         $product->setUrlKey($urlKey);
 
-        $this->processIdentifierFields($product, $resolved);
-        $this->processSelectAttributes($product, $resolved, $warnings, $failedFields);
+        $identifierHandledCodes = $this->processIdentifierFields($product, $resolved);
+        $selectHandledCodes = $this->processSelectAttributes($product, $resolved, $warnings, $failedFields);
 
-        $warnings = array_merge($warnings, $this->priceUpdater->updatePrices($product, $resolved));
+        // Added attributes (any other product attribute of the request), before prices so a
+        // requested special_from_date is kept by PriceUpdater. The attributes the select step
+        // handled are left to it (1.26.0 precedence).
+        $customResult = $this->customAttributeWriter->write(
+            $product,
+            $rawData,
+            $attributeSetId,
+            $selectHandledCodes + $identifierHandledCodes,
+            $this->getSelectSourceAttributes()
+        );
+        $warnings = array_merge($warnings, $customResult['warnings']);
+        $failedFields = array_merge($failedFields, $customResult['failed_fields']);
+
+        $warnings = array_merge(
+            $warnings,
+            $this->priceUpdater->updatePrices(
+                $product,
+                $resolved,
+                $this->validationService->allowsZeroPrice($resolved)
+            )
+        );
 
         // Images: base64 entries become data URIs for ImageUpdater (before the save)
         $creationFailed = 0;
@@ -949,16 +1007,36 @@ class CreateProduct implements CreateProductInterface
      *
      * @param \Magento\Catalog\Model\Product $product
      * @param array $resolved
-     * @return void
+     * @return array the configured EAN attribute code => 'ean' when it was written, else []
      */
     private function processIdentifierFields($product, array $resolved)
     {
+        $handledCodes = [];
         if (array_key_exists('ean', $resolved)) {
             $eanAttribute = $this->sourceHelper->getStoreValue(SourceHelper::XPATH_EAN_SOURCE);
             if ($eanAttribute) {
                 $product->setData($eanAttribute, $resolved['ean']);
+                $handledCodes[(string) $eanAttribute] = 'ean';
             }
         }
+
+        return $handledCodes;
+    }
+
+    /**
+     * Configured source attribute of each select field (Data > Color/Size/Material/Gender/Brand)
+     *
+     * @return array request field => attribute code (empty when not configured)
+     */
+    private function getSelectSourceAttributes(): array
+    {
+        return [
+            'color'    => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_COLOR_SOURCE),
+            'size'     => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_SIZE_SOURCE),
+            'material' => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_MATERIAL_SOURCE),
+            'gender'   => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_GENDER_SOURCE),
+            'brand'    => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_BRAND_SOURCE),
+        ];
     }
 
     /**
@@ -968,21 +1046,20 @@ class CreateProduct implements CreateProductInterface
      * @param array $resolved
      * @param array $warnings
      * @param array $failedFields
-     * @return void
+     * @return array configured attribute code => request field, for every select field present in
+     *               $resolved with a configured source attribute (written or failed)
      */
     private function processSelectAttributes($product, array $resolved, array &$warnings, array &$failedFields)
     {
-        $selectFields = [
-            'color'    => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_COLOR_SOURCE),
-            'size'     => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_SIZE_SOURCE),
-            'material' => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_MATERIAL_SOURCE),
-            'gender'   => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_GENDER_SOURCE),
-            'brand'    => $this->sourceHelper->getStoreValue(SourceHelper::XPATH_BRAND_SOURCE),
-        ];
+        $handledCodes = [];
+        $selectFields = $this->getSelectSourceAttributes();
 
         foreach ($selectFields as $requestField => $magentoAttribute) {
             if (!array_key_exists($requestField, $resolved) || !$magentoAttribute) {
                 continue;
+            }
+            if (!array_key_exists((string) $magentoAttribute, $handledCodes)) {
+                $handledCodes[(string) $magentoAttribute] = $requestField;
             }
             $value = $resolved[$requestField];
             if (!is_scalar($value) || trim((string) $value) === '') {
@@ -1000,6 +1077,8 @@ class CreateProduct implements CreateProductInterface
                 $failedFields[] = $requestField;
             }
         }
+
+        return $handledCodes;
     }
 
     /**

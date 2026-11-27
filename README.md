@@ -2,7 +2,7 @@
 
 Product feed export, update and creation REST API endpoints for Magento 2.
 
-Versión actual: 1.26.0
+Versión actual: 1.27.0
 
 ## Installation
 
@@ -423,11 +423,25 @@ Response (HTTP 200):
   `category` path is added. A path that does not exist is skipped with a warning; the product is
   still created.
 - Stock: `qty` (default 0) and `manage_stock` (default 1); `is_in_stock` follows `qty > 0`.
+  `use_config_manage_stock` (1.27.0, also accepted by `updateproduct`) sets «Use Config
+  Settings» of Manage Stock; it is applied before `manage_stock` and uses the same values
+  (`true`, `1`, `'1'`, `'true'` = yes; anything else = no). The two fields are independent:
+  sending `manage_stock` does not change `use_config_manage_stock`, and **`manage_stock` only
+  takes effect when `use_config_manage_stock` is 0** (send both, e.g.
+  `"use_config_manage_stock": 0, "manage_stock": 0`).
+  On **create only** (1.27.0), `manage_stock` and `use_config_manage_stock` take the yes/no rule
+  of the added attributes: yes = `true`, `1`, `'1'`, `'true'`, `'yes'`, `'si'`, `'sí'`; no =
+  `false`, `0`, `'0'`, `'false'`, `'no'` (case-insensitive), so a fixed «Sí» means yes. An empty
+  value counts as not sent (`manage_stock` then takes its default 1). Any other value is not
+  applied: warning `Field '<code>' ignored: invalid boolean value` and a failed field
+  (`manage_stock` then takes its default 1). `updateproduct` and `is_in_stock` keep the rule
+  above.
+- Any other field that is a product attribute is written too (see **Added attributes**).
 - After the save the product row is reindexed (price, EAV, flat, fulltext) for the indexers that
   are not in "Update by Schedule" mode.
 
 HTTP codes (REST route `POST /rest/all/V1/girofeeds/createproduct`): 400 invalid JSON,
-401/403 API key, 422 validation (`missing: sku|name|price`, `price` ≤ 0,
+401/403 API key, 422 validation (`missing: sku|name|price`, `price` ≤ 0 (0 is allowed for a disabled product),
 `attribute set not found`), 429 rate limit, 500 save or internal error. The frontend route
 `/girofeeds/createproduct/index` always answers HTTP 200, like `updateproduct`; read `status`
 (and `errors`) in the JSON body.
@@ -467,6 +481,108 @@ bin/magento config:set girofeeds_productapi/create/visibility 4
 bin/magento cache:clean config
 ```
 
+### Product Feed configuration fixed (1.27.0)
+
+The **Stores > Configuration > Girofeeds > Product Feed** section rendered empty (outside developer mode) since the renderer of the «Actions» column of **Extra Fields** (`Block/Adminhtml/System/Config/Form/Field/Renderer/Actions.php`) was removed; 1.27.0 restores it.
+
+### Price 0 for products created disabled (1.27.0)
+
+On **create only**, a price equal to `0` (`0`, `"0"`, `"0.00"`) is accepted when the product is
+created **disabled**: `status` (or its alias `active`) is `"0"`, `2`, `"2"`, `false` or `"false"`.
+The product is saved with price 0 and no price warning. Everything else is as in 1.26.0: price 0
+with `status` enabled or absent (default enabled) → HTTP 422 `Field 'price' must be a positive
+number`; a negative or non-numeric price → 422 whatever the status; a missing or empty price →
+`missing: price`; an invalid `status` (including the integer `0`, which the status rule never
+accepted; send `"0"`) → 422 `Field 'status' must be 1 (enabled) or 2 (disabled)`. `updateproduct`
+and `special_price` do not change.
+
+### Added attributes (1.27.0)
+
+Capability `create_custom_attributes` (test endpoint). Besides the fields above, every request
+key that is a **product attribute** is written on create, at store 0. Keys the create flow already
+reads (directly, as an alias or by priority: `sku`, `reference`, `name`, prices, `status`,
+`active`, `visibility`, `visible`, `attribute_set`, `ean`/`ean13`/`gtin`, `brand`, `color`*,
+`size`*, `material`*, `gender`*, `weight`, `tax_class_id`, `website_ids`, `url_key`, descriptions,
+images, categories), the stock fields (`qty`, `stock`, `is_in_stock`, `manage_stock`,
+`use_config_manage_stock`, `min_sale_qty`, `max_sale_qty`, `backorders`), request metadata
+(`store`, `store_id`, `id_product`, `key`) and system data (`id`, `entity_id`,
+`attribute_set_id`, `type_id`, `created_at`, `updated_at`, `has_options`, `required_options`,
+`media_gallery`, `gallery`, `tier_price`, `quantity_and_stock_status`) are never treated as added
+attributes (list: `CustomAttributeWriter::RESERVED_KEYS`).
+
+\* `color`, `size`, `material` and `gender` are reserved only while **Data > Color / Size /
+Material / Gender** has a source attribute configured: then, as in 1.26.0, the value goes to
+**that configured attribute** (by label) and not to an attribute named `color`/…. Without a
+configured source attribute (where 1.26.0 dropped the value silently), the key is written as
+its own attribute code with every rule below (attribute lookup, attribute set, label or option
+id, warnings, failed fields). `brand` is not part of this rule: it behaves as in 1.26.0 in every
+configuration.
+
+`manufacturer` is not reserved: as in 1.26.0 it is the `brand` alias when `brand` is not sent,
+and it is also written to the `manufacturer` attribute when that attribute exists.
+
+**One writer per attribute; the select step keeps precedence.** The attributes configured as
+source of `brand`, `color`, `size`, `material` and `gender` (**Data > Brand**, …) are written only
+by the 1.26.0 select step whenever that field is in the request (written or failed). A raw key
+equal to one of those attribute codes is then skipped:
+
+- with the warning `Field '<code>' ignored: the attribute is handled by '<field>'` (not
+  a failed field) when the request also carries the select field itself, e.g. `brand` and
+  `manufacturer` with **Data > Brand** = `manufacturer` (the attribute takes the `brand` value,
+  as in 1.26.0);
+- silently when the key only acted as the alias: `manufacturer` alone becomes `brand`, and the
+  select step's result (written, or `Field 'brand': …` warning) is the only message, exactly as
+  in 1.26.0. In that configuration `manufacturer` is matched **by admin label only**, as `brand`
+  always was; an option id is not accepted.
+
+With any other **Data > Brand** attribute (or none), `manufacturer` is written by the generic
+writer as described below (label or option id), and `brand` goes to the configured attribute.
+
+The attribute configured in **Data > EAN** counts as handled in the same way when the request
+carries `ean` (or `ean13` / `gtin`): the EAN step writes it, and a raw key equal to that
+attribute code is skipped with `Field '<code>' ignored: the attribute is handled by 'ean'`.
+
+**Attributes never written** (`CustomAttributeWriter::BLOCKED_ATTRIBUTES`): `custom_layout_update`,
+`custom_layout_update_file`, `custom_layout`, `custom_design`, `custom_design_from`,
+`custom_design_to`, `page_layout`, `options_container`. A non-blank value only produces the
+warning `Field '<code>' ignored: attribute not allowed` (not a failed field).
+
+Reserved keys, blocked attributes and the codes handled by the select step are matched
+regardless of case (`Price`, `Custom_Layout_Update`, `Manufacturer`).
+
+```json
+{
+  "sku": "GF-0002",
+  "name": "Lavadora 8 kg",
+  "price": 399,
+  "am_shipping_type": "Voluminoso",
+  "availability": "Entrega en 48 h",
+  "mpn": "WTX87M20",
+  "manufacturer": "Bosch",
+  "use_config_manage_stock": 0,
+  "manage_stock": 0
+}
+```
+
+Value rules (a value that is not valid **never stops the creation**: the product is created, the
+field is skipped and the response carries a warning; invalid values also go to `failed_fields`):
+
+| Attribute | Accepted value |
+|-----------|----------------|
+| `select` | option label (case-insensitive, trimmed, admin labels) or else the exact option id. Options are **never created**; otherwise the warning lists the available labels (at most 50, then `…`) |
+| `multiselect` | list or comma-separated string; each element as in `select`; the valid ones are written and each invalid one warns |
+| `boolean` (Yes/No input) | yes: `true`, `1`, `'1'`, `'true'`, `'yes'`, `'si'`, `'sí'`; no: `false`, `0`, `'0'`, `'false'`, `'no'` (case-insensitive) |
+| Yes/No dropdown (`select` with a boolean source) | treated as `select`: the option label as shown in admin (`Yes`/`No`, or the translated label) or the option id (`1`/`0`); `true`/`si` are not accepted |
+| numeric (`decimal`/`int` backend, not a list or Yes/No) | a finite number or numeric string (`12.5`; `12,5` and `1e400` are rejected) |
+| `date` / `datetime` | only `Y-m-d`, `Y-m-d H:i`, `Y-m-d H:i:s` and ISO 8601 `Y-m-dTH:i[:s]` with optional `Z` or offset (`+01:00`, `-0530`), with a real calendar date and valid time. Written as `Y-m-d` or `Y-m-d H:i:s` (the time as sent; the `Z`/offset is checked and dropped). Anything else is rejected: digits only (`20261201`), `01/12/2026`, `12/01/2026`, words (`tomorrow`), integers, `2026-02-30` |
+| text and the rest | any scalar, written as a string; a list or object is rejected. With backend `varchar`, at most **255 characters** (otherwise `Field '<code>' ignored: value longer than 255 characters`, failed field); backend `text` is unlimited |
+
+- `null` or an empty string: not written, no warning.
+- Not a product attribute: `Field '<code>' ignored: not a product attribute`.
+- Not in the attribute set of the product, a `static` attribute, or input `media_image`,
+  `gallery` or `weee`: warning (`Field '<code>' ignored: …`), not written.
+- Any error while writing one attribute: `Field '<code>' not written: <message>`.
+
 ### Prueba en testo3
 
 1. Instalar la versión 1.26.0 (ZIP `girofeeds-magento-1.26.0.zip` en
@@ -495,6 +611,93 @@ bin/magento cache:clean config
    `status: created`, aviso `image #1: not an image`, `images.failed: 1` y sin imagen en la
    galería.
 8. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
+
+### Prueba de la 1.27.0
+
+Sin Magento local: la 1.27.0 solo se ha validado con `php -l`, los tests de la lógica de valores
+y revisión de código. En la tienda de lacoop (Magento 2.3.3) se instala **a partir del
+1/12/2026** (después del Cyber Monday). Usar SKU nuevos en cada paso y borrar los productos al
+acabar.
+
+1. Copia de seguridad del módulo instalado. Instalar la 1.27.0 (ZIP
+   `girofeeds-magento-1.27.0.zip` en `app/code/Girofeeds/ProductApi`) y ejecutar:
+
+   ```bash
+   bin/magento setup:upgrade
+   bin/magento setup:di:compile
+   bin/magento cache:flush
+   ```
+
+2. `GET /rest/all/V1/girofeeds/test?key=<key>` → `version` 1.27.0 y `capabilities` incluye
+   `create_custom_attributes` (además de `createproduct`).
+3. Abrir **Stores > Configuration > Girofeeds > Product Feed** → la sección se muestra entera
+   (antes salía vacía), con **Product Data Settings**. Elegir en **EAN / GTIN** el atributo de EAN
+   de la tienda (lacoop: `gtin`) con el selector de ámbito en **Default Config**, guardar y limpiar
+   la caché de configuración. El valor se lee para la tienda en la que se ejecuta la petición de
+   creación, así que con escritura en todas las vistas (la opción por defecto) solo cuenta el de
+   Default Config y uno guardado solo en una vista de tienda se ignora. Después, crear un
+   producto con SKU nuevo y `"ean": "<EAN de prueba>"` → `status: created`; en el admin (All Store
+   Views) el atributo elegido tiene ese EAN. Repetir la petición con otro SKU y el mismo `ean` →
+   `status: exists` con el `product_id` anterior (idempotencia por EAN).
+4. En el admin, anotar el atributo de **Stores > Configuration > Girofeeds > Product Feed > Product Data Settings > Brand** («Data > Brand») (en
+   adelante «atributo de marca») y el tipo de `am_shipping_type`, `availability`, `mpn` y
+   `manufacturer` (**Stores > Attributes > Product**), y comprobar que están en el conjunto de
+   atributos con el que se crea (por defecto el de **Product Creation**). Elegir para
+   `manufacturer` una **etiqueta** que exista como opción de `manufacturer` y también del
+   atributo de marca (si es otro atributo). Crear un producto con los seis campos de lacoop:
+   `am_shipping_type` (etiqueta de una opción existente), `availability`, `mpn`, `manufacturer`
+   (esa etiqueta), `use_config_manage_stock: 0` y `manage_stock: 0`, **sin** `brand` →
+   `status: created`, `warnings` vacío. En el admin (All Store Views): los cuatro atributos con
+   el valor enviado (las listas con la opción elegida), el atributo de marca con esa misma
+   etiqueta y, en **Advanced Inventory**, «Manage Stock» = No con «Use Config Settings»
+   desmarcado. (Si el atributo de marca no tiene esa etiqueta, el producto se crea igual con
+   `manufacturer` escrito y el aviso `Field 'brand': …`, como en la 1.26.0. Si no hay atributo
+   de marca configurado, solo se comprueba `manufacturer`, y `warnings` queda vacío.)
+5. Igual que el paso 4 pero con `"am_shipping_type": "NoExiste"` → `status: created`, aviso
+   `Field 'am_shipping_type': Value 'NoExiste' is not a valid option … Available options: …`,
+   `failed_fields` con `am_shipping_type`; el producto se crea sin ese valor y no aparece ninguna
+   opción nueva en el atributo.
+6. Añadir una clave que no es atributo (`"campo_inventado": "x"`) → `status: created` con el
+   aviso `Field 'campo_inventado' ignored: not a product attribute`.
+7. Stock:
+   - SKU nuevo con `"manage_stock": 0` y `"use_config_manage_stock": 0` → en el admin,
+     **Advanced Inventory**: «Use Config Settings» de Manage Stock **desmarcado** y «Manage
+     Stock» = **No**.
+   - SKU nuevo con `"manage_stock": "no"` y `"use_config_manage_stock": "Sí"` → «Use Config
+     Settings» marcado (el valor efectivo es el de la configuración), sin avisos.
+   - SKU nuevo solo con `"manage_stock": 0` → «Use Config Settings» sigue marcado.
+   - SKU nuevo con `"use_config_manage_stock": 0` y `"manage_stock": 1` → «Manage Stock» = Sí con
+     «Use Config Settings» desmarcado.
+   - SKU nuevo con `"manage_stock": "quizás"` → `status: created`, aviso
+     `Field 'manage_stock' ignored: invalid boolean value` y `failed_fields` con `manage_stock`.
+   - Con `updateproduct`, enviar `"use_config_manage_stock": 1` a uno de ellos → vuelve a
+     marcarse.
+8. `manufacturer` y `brand` (A y B, etiquetas existentes de `manufacturer`):
+   - SKU nuevo con `"brand": "A"` y `"manufacturer": "B"`. Si el atributo de marca es
+     `manufacturer` → `manufacturer` = A y aviso
+     `Field 'manufacturer' ignored: the attribute is handled by 'brand'` (sin
+     `failed_fields`). Si es otro atributo → `manufacturer` = B, el atributo de marca = A y sin
+     ese aviso. Si no hay atributo de marca configurado → `manufacturer` = B.
+   - SKU nuevo solo con `"manufacturer": "A"` → el atributo de marca (sea cual sea) queda con A,
+     como en la 1.26.0; si es otro atributo, `manufacturer` también = A. Ningún aviso nuevo.
+   - Si el atributo de marca es `manufacturer`: SKU nuevo solo con `"manufacturer": "<id de la
+     opción A>"` → aviso `Field 'brand': Value '<id>' is not a valid option…` y `failed_fields`
+     con `brand`, igual que en la 1.26.0 (en esa configuración solo vale la etiqueta).
+   - SKU nuevo con `"custom_layout_update": "<x/>"` → aviso
+     `Field 'custom_layout_update' ignored: attribute not allowed` y el campo vacío en el admin.
+   - `color` (igual `size`, `material`, `gender`): anotar **Data > Color**. Si tiene un atributo
+     configurado, SKU nuevo con `"color": "<etiqueta de ese atributo>"` → el valor va a **ese
+     atributo configurado**, no a `color` (como en la 1.26.0). Si no lo tiene, con
+     `"color": "<etiqueta del atributo color>"` → se escribe el atributo `color`; con una
+     etiqueta inexistente → aviso `Field 'color': Value … is not a valid option…`.
+9. Precio 0: SKU nuevo con `"price": "0"` y `"status": "0"` → `status: created` sin avisos de
+   precio; en el admin el producto está **deshabilitado** con precio 0. El mismo con
+   `"status": "1"` (o sin `status`) → HTTP 422 `Field 'price' must be a positive number` y no se
+   crea nada. Con `"price": -1` y `"status": "0"` → 422.
+10. Repetir **la misma petición** del paso 4 → `status: exists`, mismo `product_id`, sin cambios.
+11. Un `updateproduct` normal a un producto existente sigue funcionando igual que con la 1.26.0
+    (también `"price": 0` sigue dando `Field 'price' must be a positive number`).
+12. Revisar `var/log` (log de Girofeeds) y borrar los productos de prueba.
 
 ## CLI Commands
 

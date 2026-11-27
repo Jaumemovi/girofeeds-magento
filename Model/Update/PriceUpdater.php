@@ -9,13 +9,24 @@ use Magento\Catalog\Api\Data\ProductInterface;
 class PriceUpdater
 {
 
-    public function updatePrices(ProductInterface $product, array $resolvedData): array
+    /**
+     * Update prices
+     *
+     * @param ProductInterface $product
+     * @param array $resolvedData
+     * @param bool $allowZeroPrice createproduct only: a price of 0 is set without warning
+     *                             (products created disabled, ValidationService::allowsZeroPrice)
+     * @return array
+     */
+    public function updatePrices(ProductInterface $product, array $resolvedData, bool $allowZeroPrice = false): array
     {
         $warnings = [];
 
         if (array_key_exists('price', $resolvedData)) {
             $price = (float) $resolvedData['price'];
-            if ($price <= 0) {
+            if ($allowZeroPrice && $price == 0) {
+                $product->setPrice(0.0);
+            } elseif ($price <= 0) {
                 $warnings[] = "Field 'price' must be a positive number, received: {$price}";
             } else {
                 $product->setPrice($price);
